@@ -2,28 +2,42 @@ package com.resumepilot.auth.controller;
 
 import com.resumepilot.auth.dto.AuthRequest;
 import com.resumepilot.auth.dto.AuthResponse;
-import com.resumepilot.auth.entity.User;
+import com.resumepilot.auth.dto.RegisterRequest;
 import com.resumepilot.auth.service.AuthService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/auth")
+@RequiredArgsConstructor
 public class AuthResource {
 
-    private final AuthService svc;
+	private final AuthService svc;
 
-    public AuthResource(AuthService svc) {
-        this.svc = svc;
-    }
+	@PostMapping("/register")
+	public ResponseEntity<AuthResponse> register(@RequestBody RegisterRequest req) {
+		return ResponseEntity.ok(svc.register(req));
+	}
 
-    @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@RequestBody User u) {
-        return ResponseEntity.ok(svc.register(u));
-    }
+	@PostMapping("/login")
+	public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest req) {
+		return ResponseEntity.ok(svc.login(req));
+	}
 
-    @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest req) {
-        return ResponseEntity.ok(svc.login(req));
-    }
+	// Google OAuth2 Success Callback
+	@GetMapping("/oauth2-success")
+	public ResponseEntity<AuthResponse> googleLoginSuccess(@AuthenticationPrincipal OAuth2User principal) {
+		if (principal == null) {
+			return ResponseEntity.status(401).build();
+		}
+
+		String email = principal.getAttribute("email");
+		String name = principal.getAttribute("name");
+
+		// Use the logic to save/get user and return JWT
+		return ResponseEntity.ok(svc.processOAuthPostLogin(email, name));
+	}
 }

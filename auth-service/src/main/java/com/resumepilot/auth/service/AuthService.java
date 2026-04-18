@@ -6,7 +6,8 @@ import com.resumepilot.auth.dto.RegisterRequest;
 import com.resumepilot.auth.entity.User;
 
 public interface AuthService {
-    AuthResponse register(User u);
+    AuthResponse register(RegisterRequest req);
     AuthResponse login(AuthRequest req);
-	AuthResponse register(RegisterRequest req);
+    AuthResponse register(User u);
+    AuthResponse processOAuthPostLogin(String email, String name);
 }

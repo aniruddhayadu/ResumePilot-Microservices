@@ -4,20 +4,52 @@ server:
 spring:
     application:
         name: auth-service
+
     datasource:
-        url: jdbc:mysql://localhost:3306/resume_auth_db?createDatabaseIfNotExist=true
-        username: root
-        password: root # Change this to your MySQL password
+        url: jdbc:mysql://localhost:3306/resume_auth_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+        username: ${DB_USERNAME:root}
+        password: ${DB_PASSWORD:root}
+
     jpa:
         hibernate:
             ddl-auto: update
         show-sql: true
+        properties:
+            hibernate:
+                dialect: org.hibernate.dialect.MySQLDialect
+
+    security:
+        oauth2:
+            client:
+                registration:
+                    google:
+                        client-id: ${GOOGLE_CLIENT_ID}
+                        client-secret: ${GOOGLE_CLIENT_SECRET}
+                        # Fixed Indentation here:
+                        redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+                        scope:
+                            - email
+                            - profile
+                # Added this for extra stability
+                provider:
+                    google:
+                        user-name-attribute: email
+
+jwt:
+    secret: ${JWT_SECRET}
+    expiration: 86400000
 
 eureka:
     client:
         serviceUrl:
             defaultZone: http://localhost:8761/eureka/
+        register-with-eureka: true
+        fetch-registry: true
+    instance:
+        prefer-ip-address: true
+        instance-id: ${spring.application.name}:${random.value}
 
-jwt:
-    secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
-    expiration: 86400000 # 1 day in milliseconds
+logging:
+    level:
+        com.resumepilot.auth: DEBUG
+        org.springframework.security: DEBUG # Changed to DEBUG to see OAuth2 errors
