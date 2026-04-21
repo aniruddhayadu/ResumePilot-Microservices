@@ -1,27 +1,39 @@
 server:
-  port: 8080
+    port: 8080
 
 spring:
-  application:
-    name: api-gateway
-  cloud:
-    gateway:
-      discovery:
-        locator:
-          enabled: true
-          lower-case-service-id: true
-      globalcors:
-        cors-configurations:
-          '[/**]':
-            allowedOrigins: "http://localhost:5173" # React's default Vite port
-            allowedMethods:
-              - GET
-              - POST
-              - PUT
-              - DELETE
-            allowedHeaders: "*"
+    application:
+        name: api-gateway
+    cloud:
+        gateway:
+            discovery:
+                locator:
+                    enabled: true
+                    lower-case-service-id: true
+
+            globalcors:
+                add-to-simple-url-handler-mapping: true 
+                corsConfigurations:
+                    "[/**]":
+                        allowedOrigins: "http://localhost:5173"
+                        allowedHeaders: "*"
+                        allowedMethods: "*"
+                        allowCredentials: true
+
+            routes:
+                - id: auth-service
+                  uri: lb://auth-service
+                  predicates:
+                      - Path=/auth/**, /oauth2/**, /login/**
+
+                - id: resume-service
+                  uri: lb://resume-service
+                  predicates:
+                      - Path=/resume/**
 
 eureka:
-  client:
-    serviceUrl:
-      defaultZone: http://localhost:8761/eureka/
+    client:
+        serviceUrl:
+            defaultZone: http://localhost:8761/eureka/
+    instance:
+        prefer-ip-address: true

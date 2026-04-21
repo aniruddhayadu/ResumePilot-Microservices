@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/auth")
@@ -18,7 +19,7 @@ public class AuthResource {
 	private final AuthService svc;
 
 	@PostMapping("/register")
-	public ResponseEntity<AuthResponse> register(@RequestBody RegisterRequest req) {
+	public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest req) {
 		return ResponseEntity.ok(svc.register(req));
 	}
 
@@ -27,7 +28,6 @@ public class AuthResource {
 		return ResponseEntity.ok(svc.login(req));
 	}
 
-	// Google OAuth2 Success Callback
 	@GetMapping("/oauth2-success")
 	public ResponseEntity<AuthResponse> googleLoginSuccess(@AuthenticationPrincipal OAuth2User principal) {
 		if (principal == null) {
@@ -37,7 +37,6 @@ public class AuthResource {
 		String email = principal.getAttribute("email");
 		String name = principal.getAttribute("name");
 
-		// Use the logic to save/get user and return JWT
 		return ResponseEntity.ok(svc.processOAuthPostLogin(email, name));
 	}
 }
