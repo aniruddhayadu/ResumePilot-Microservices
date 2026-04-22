@@ -12,7 +12,7 @@ spring:
                     lower-case-service-id: true
 
             globalcors:
-                add-to-simple-url-handler-mapping: true 
+                add-to-simple-url-handler-mapping: true
                 corsConfigurations:
                     "[/**]":
                         allowedOrigins: "http://localhost:5173"
