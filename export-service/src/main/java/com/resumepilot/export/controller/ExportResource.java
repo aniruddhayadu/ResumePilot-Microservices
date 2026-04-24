@@ -12,6 +12,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/exports")
 @RequiredArgsConstructor
+@CrossOrigin("*")
 public class ExportResource {
 
 	private final ExportService exportService;

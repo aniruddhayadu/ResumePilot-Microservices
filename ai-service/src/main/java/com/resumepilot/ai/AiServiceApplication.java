@@ -1,14 +1,12 @@
-package com.resumepilot.export;
+package com.resumepilot.ai;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-
-public class ExportServiceApplication {
-
+public class AiServiceApplication {
 	public static void main(String[] args) {
-		SpringApplication.run(ExportServiceApplication.class, args);
+		SpringApplication.run(AiServiceApplication.class, args);
+		System.out.println("AI Service Running");
 	}
-
 }

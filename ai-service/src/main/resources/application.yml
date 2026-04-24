@@ -1,0 +1,33 @@
+server:
+    port: 8085
+
+spring:
+    application:
+        name: ai-service
+
+    datasource:
+        url: jdbc:mysql://${MYSQL_HOST:localhost}:3306/resume_ai_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+        username: ${DB_USERNAME:root}
+        password: ${DB_PASSWORD:root}
+
+    jpa:
+        hibernate:
+            ddl-auto: update
+        show-sql: true
+
+# Eureka Server Configuration
+eureka:
+    client:
+        serviceUrl:
+            defaultZone: http://${EUREKA_HOST:localhost}:8761/eureka/
+        register-with-eureka: true
+        fetch-registry: true
+
+    instance:
+        prefer-ip-address: true
+
+# Groq AI Configuration
+groq:
+    url: https://api.groq.com/openai/v1/chat/completions
+    key: ${GROQ_API_KEY}
+    model: llama-3.1-8b-instant

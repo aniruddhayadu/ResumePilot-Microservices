@@ -24,3 +24,11 @@ eureka:
 
     instance:
         prefer-ip-address: true
+
+# AWS S3 Configuration (Soft Coded - Enterprise Standard)
+aws:
+    access-key: ${AWS_ACCESS_KEY}
+    secret-key: ${AWS_SECRET_KEY}
+    s3:
+        bucket-name: ${AWS_BUCKET_NAME:resumepilot-pdf-exports-bhai}
+        region: ${AWS_REGION:ap-southeast-2}

@@ -15,12 +15,17 @@ import java.util.Map;
 public class ResumeController {
 
 	private final ResumeService resumeService;
-	private final ResumeRepository resumeRepository; // Add this line
+	private final ResumeRepository resumeRepository;
 
 	@Autowired
 	public ResumeController(ResumeService resumeService, ResumeRepository resumeRepository) {
 		this.resumeService = resumeService;
-		this.resumeRepository = resumeRepository; // Initialize it
+		this.resumeRepository = resumeRepository;
+	}
+
+	@GetMapping("/get/{id}")
+	public ResponseEntity<Resume> getResumeById(@PathVariable Long id) {
+		return resumeRepository.findById(id).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
 	}
 
 	@PostMapping("/create")
