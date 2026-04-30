@@ -11,6 +11,8 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -33,10 +35,24 @@ public class AuthResource {
 		if (principal == null) {
 			return ResponseEntity.status(401).build();
 		}
-
 		String email = principal.getAttribute("email");
 		String name = principal.getAttribute("name");
-
 		return ResponseEntity.ok(svc.processOAuthPostLogin(email, name));
+	}
+
+	// NAYE ENDPOINTS FORGOT PASSWORD KE LIYE
+	@PostMapping("/forgot-password")
+	public ResponseEntity<String> forgotPassword(@RequestBody Map<String, String> payload) {
+		String email = payload.get("email");
+		svc.forgotPassword(email);
+		return ResponseEntity.ok("Password reset link has been sent to your email.");
+	}
+
+	@PostMapping("/reset-password")
+	public ResponseEntity<String> resetPassword(@RequestBody Map<String, String> payload) {
+		String token = payload.get("token");
+		String newPassword = payload.get("newPassword");
+		svc.resetPassword(token, newPassword);
+		return ResponseEntity.ok("Password has been reset successfully.");
 	}
 }

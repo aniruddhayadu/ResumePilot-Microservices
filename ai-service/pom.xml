@@ -1,30 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
 		<version>4.0.5</version>
-		<relativePath/> <!-- lookup parent from repository -->
+		<relativePath />
 	</parent>
 	<groupId>com.resumepilot</groupId>
 	<artifactId>ai-service</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>ai-service</name>
-	<description>pdf export service </description>
-	<url/>
+	<description>AI service for ResumePilot</description>
+	<url />
 	<licenses>
-		<license/>
+		<license />
 	</licenses>
 	<developers>
-		<developer/>
+		<developer />
 	</developers>
 	<scm>
-		<connection/>
-		<developerConnection/>
-		<tag/>
-		<url/>
+		<connection />
+		<developerConnection />
+		<tag />
+		<url />
 	</scm>
 	<properties>
 		<java.version>17</java.version>
@@ -35,10 +36,12 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa</artifactId>
 		</dependency>
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-webmvc</artifactId>
+			<artifactId>spring-boot-starter-web</artifactId>
 		</dependency>
+
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
@@ -56,15 +59,17 @@
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-data-jpa-test</artifactId>
+			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+
 		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-webmvc-test</artifactId>
-			<scope>test</scope>
+			<groupId>org.apache.pdfbox</groupId>
+			<artifactId>pdfbox</artifactId>
+			<version>2.0.30</version>
 		</dependency>
 	</dependencies>
+
 	<dependencyManagement>
 		<dependencies>
 			<dependency>
@@ -100,21 +105,6 @@
 						<phase>compile</phase>
 						<goals>
 							<goal>compile</goal>
-						</goals>
-						<configuration>
-							<annotationProcessorPaths>
-								<path>
-									<groupId>org.projectlombok</groupId>
-									<artifactId>lombok</artifactId>
-								</path>
-							</annotationProcessorPaths>
-						</configuration>
-					</execution>
-					<execution>
-						<id>default-testCompile</id>
-						<phase>test-compile</phase>
-						<goals>
-							<goal>testCompile</goal>
 						</goals>
 						<configuration>
 							<annotationProcessorPaths>

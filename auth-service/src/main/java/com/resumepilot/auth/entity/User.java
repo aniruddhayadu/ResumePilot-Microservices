@@ -1,7 +1,6 @@
 package com.resumepilot.auth.entity;
 
 import java.time.LocalDateTime;
-
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -23,10 +22,14 @@ public class User {
     @Column(nullable = false)
     private String passwordHash;
     private String phone;
-    private String role; // FREE / PREMIUM / ADMIN
+    private String role; 
     private String subscriptionPlan;
     private boolean isActive = true;
     private LocalDateTime createdAt;
+    
+    private String resetToken;
+    private LocalDateTime resetTokenExpiry;
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

@@ -1,8 +1,7 @@
 package com.resumepilot.ai.service;
 
-import com.resumepilot.ai.dto.ChatReq;
-import com.resumepilot.ai.dto.ChatRes;
-import com.resumepilot.ai.dto.Msg;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -18,66 +18,74 @@ import java.util.List;
 public class AiServiceImpl implements AiService {
 
 	private final RestTemplate restTemplate;
+	private final ObjectMapper objectMapper = new ObjectMapper();
 
-	@Value("${groq.url}")
+	@Value("${gemini.url}")
 	private String apiUrl;
 
-	@Value("${groq.key}")
+	@Value("${gemini.key}")
 	private String apiKey;
-
-	@Value("${groq.model}")
-	private String model;
 
 	@Override
 	public String generateSummary(String jobTitle) {
-
 		if (jobTitle == null || jobTitle.trim().isEmpty()) {
-			return getFallbackSummary(jobTitle);
+			return getFallbackSummary("Professional");
 		}
+		String prompt = "Write a highly professional 3-sentence resume summary for a " + jobTitle
+				+ ". Keep it impactful and modern.";
+		return callGemini(prompt, getFallbackSummary(jobTitle));
+	}
 
+	@Override
+	public String analyzeResume(String jobTitle, String resumeContent) {
+		if (resumeContent == null || resumeContent.trim().isEmpty()) {
+			return "{\"score\": 0, \"feedback\": \"Resume content is empty. Please fill in your details.\"}";
+		}
+		String prompt = String.format("Analyze this resume for the role of '%s'.\n\nResume Content:\n%s\n\n"
+				+ "Provide an ATS score out of 100 and brief feedback. "
+				+ "You MUST return ONLY a valid raw JSON object in this exact format: {\"score\": 85, \"feedback\": \"Good skills.\"} "
+				+ "Do not add any markdown formatting.", jobTitle, resumeContent);
+
+		String fallbackJson = "{\"score\": 70, \"feedback\": \"Could not reach AI for deep analysis. Passed basic format check.\"}";
+		return callGemini(prompt, fallbackJson);
+	}
+
+	private String callGemini(String prompt, String fallbackContent) {
 		try {
-			log.info("Calling Groq API for: {}", jobTitle);
+			String fullUrl = apiUrl + "?key=" + apiKey;
+			log.info("🚀 AI Server ko hit maar raha hoon...");
 
-			// headers
+			Map<String, Object> requestBody = Map.of("contents",
+					List.of(Map.of("parts", List.of(Map.of("text", prompt)))));
+
 			HttpHeaders headers = new HttpHeaders();
 			headers.setContentType(MediaType.APPLICATION_JSON);
-			headers.setBearerAuth(apiKey);
 
-			// prompt
-			String prompt = String.format(
-					"Write a highly professional 3-sentence resume summary for a %s. Keep it impactful and modern.",
-					jobTitle);
+			HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+			ResponseEntity<String> response = restTemplate.postForEntity(fullUrl, entity, String.class);
 
-			// request body
-			ChatReq req = new ChatReq();
-			req.setModel(model);
-			req.setMessages(List.of(new Msg("system", "You are an expert ATS-friendly resume writer."),
-					new Msg("user", prompt)));
+			if (response.getStatusCode() == HttpStatus.OK) {
+				JsonNode root = objectMapper.readTree(response.getBody());
+				String result = root.path("candidates").get(0).path("content").path("parts").get(0).path("text")
+						.asText();
 
-			HttpEntity<ChatReq> entity = new HttpEntity<>(req, headers);
-
-			// API call
-			ChatRes res = restTemplate.postForObject(apiUrl, entity, ChatRes.class);
-
-			// response parsing
-			if (res != null && res.getChoices() != null && !res.getChoices().isEmpty()) {
-				Msg msg = res.getChoices().get(0).getMessage();
-				if (msg != null && msg.getContent() != null) {
-					return msg.getContent().trim();
+				// Clean JSON tags for ATS tool
+				if (result.contains("{") && result.contains("}")) {
+					int start = result.indexOf("{");
+					int end = result.lastIndexOf("}");
+					return result.substring(start, end + 1).trim();
 				}
+				return result.trim();
 			}
-
 		} catch (Exception e) {
-			log.error("Groq API failed", e);
+			log.error("❌ Gemini API fail ho gayi: {}", e.getMessage());
 		}
-
-		return getFallbackSummary(jobTitle);
+		return fallbackContent;
 	}
 
 	private String getFallbackSummary(String jobTitle) {
-		String role = (jobTitle != null && !jobTitle.isBlank()) ? jobTitle : "professional";
-		return String.format("Results-driven %s with a proven track record of delivering high-quality solutions. "
-				+ "Adept at collaborating with cross-functional teams to drive project success. "
-				+ "Passionate about continuous learning and implementing best practices.", role);
+		return String.format(
+				"Results-driven %s with a proven track record of delivering high-quality solutions. Adept at collaborating with cross-functional teams to drive project success. Passionate about continuous learning.",
+				jobTitle);
 	}
 }

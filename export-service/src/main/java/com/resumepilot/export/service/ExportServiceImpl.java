@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.kernel.pdf.canvas.draw.SolidLine;
 import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.LineSeparator;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.resumepilot.export.aws.S3StorageService;
@@ -69,42 +71,68 @@ public class ExportServiceImpl implements ExportService {
 					? contentNode.get("fullName").asText()
 					: defaultName;
 
+			// Extracting new contact fields
+			String phone = contentNode.has("phone") ? contentNode.get("phone").asText() : "";
+			String linkedin = contentNode.has("linkedin") ? contentNode.get("linkedin").asText() : "";
+			String github = contentNode.has("github") ? contentNode.get("github").asText() : "";
+
 			String summary = contentNode.has("summary") ? contentNode.get("summary").asText() : "Not provided";
 			String skills = contentNode.has("skills") ? contentNode.get("skills").asText() : "Not provided";
 			String experience = contentNode.has("experience") ? contentNode.get("experience").asText() : "Not provided";
 			String education = contentNode.has("education") ? contentNode.get("education").asText() : "Not provided";
 
-			// iText 7 pdf generation engine
+			// iText 7 pdf generation engine - Premium Format
 			ByteArrayOutputStream baos = new ByteArrayOutputStream();
 			PdfWriter writer = new PdfWriter(baos);
 			PdfDocument pdf = new PdfDocument(writer);
 			Document document = new Document(pdf);
 
+			// Setting Professional Margins
+			document.setMargins(40, 40, 40, 40);
+
+			// 1. Full Name (Center, Large & Bold)
 			document.add(new Paragraph(fullName.toUpperCase()).setBold().setFontSize(22)
-					.setTextAlignment(TextAlignment.CENTER));
+					.setTextAlignment(TextAlignment.CENTER).setMarginBottom(2));
 
-			// Job Title
+			// 2. Job Title (Center, Medium)
 			String titleStr = resumeData.getTitle() != null ? resumeData.getTitle() : "";
-			document.add(
-					new Paragraph(titleStr).setFontSize(14).setTextAlignment(TextAlignment.CENTER).setMarginBottom(5));
+			if (!titleStr.isEmpty()) {
+				document.add(new Paragraph(titleStr).setFontSize(12).setTextAlignment(TextAlignment.CENTER)
+						.setMarginBottom(2));
+			}
 
-			// Email Id
-			String emailStr = resumeData.getUserEmail() != null ? resumeData.getUserEmail() : "";
-			document.add(
-					new Paragraph(emailStr).setFontSize(10).setTextAlignment(TextAlignment.CENTER).setMarginBottom(20));
+			// 3. Contact Info Row (Email | Phone | LinkedIn | GitHub)
+			java.util.StringJoiner contactJoiner = new java.util.StringJoiner("  |  ");
+			if (resumeData.getUserEmail() != null && !resumeData.getUserEmail().isEmpty()) {
+				contactJoiner.add(resumeData.getUserEmail());
+			}
+			if (!phone.isEmpty())
+				contactJoiner.add(phone);
+			if (!linkedin.isEmpty())
+				contactJoiner.add("LinkedIn: " + linkedin);
+			if (!github.isEmpty())
+				contactJoiner.add("GitHub: " + github);
 
-			// PDF Sections
-			document.add(new Paragraph("PROFESSIONAL SUMMARY").setBold().setFontSize(14));
-			document.add(new Paragraph(summary).setMarginBottom(10));
+			document.add(new Paragraph(contactJoiner.toString()).setFontSize(10).setTextAlignment(TextAlignment.CENTER)
+					.setMarginBottom(20));
 
-			document.add(new Paragraph("TECHNICAL SKILLS").setBold().setFontSize(14));
-			document.add(new Paragraph(skills).setMarginBottom(10));
+			// 4. PDF Sections Layout with Solid Lines
+			String[][] sections = { { "OBJECTIVE", summary }, { "TECHNICAL SKILLS", skills },
+					{ "EXPERIENCE", experience }, { "EDUCATION", education } };
 
-			document.add(new Paragraph("EXPERIENCE").setBold().setFontSize(14));
-			document.add(new Paragraph(experience).setMarginBottom(10));
+			for (String[] sec : sections) {
+				String secTitle = sec[0];
+				String secContent = sec[1];
 
-			document.add(new Paragraph("EDUCATION").setBold().setFontSize(14));
-			document.add(new Paragraph(education).setMarginBottom(10));
+				if (secContent != null && !secContent.trim().isEmpty() && !secContent.equals("Not provided")) {
+					// Heading
+					document.add(new Paragraph(secTitle).setBold().setFontSize(12).setMarginBottom(2));
+					// Solid Line Underneath
+					document.add(new LineSeparator(new SolidLine(1f)).setMarginBottom(8));
+					// Body Text
+					document.add(new Paragraph(secContent).setFontSize(10).setMarginBottom(15));
+				}
+			}
 
 			document.close();
 
@@ -115,7 +143,7 @@ public class ExportServiceImpl implements ExportService {
 			String fileName = "resume-" + resumeId + "-" + job.getJobId() + ".pdf";
 			String s3Url = s3StorageService.uploadFile(fileName, pdfBytes, "application/pdf");
 
-			// 5. Mark job complete
+			// Mark job complete
 			job.setStatus(JobStatus.COMPLETED);
 			job.setFileUrl(s3Url);
 			job.setFileSizeKb(pdfBytes.length / 1024);
