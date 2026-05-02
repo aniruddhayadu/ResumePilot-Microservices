@@ -41,8 +41,4 @@ public class AiController {
 		}
 	}
 
-	@GetMapping("/ping")
-	public String ping() {
-		return "BHAIII SERVER CHAL RAHA HAI AUR NAYA CODE BHI LOAD HO GAYA!";
-	}
 }
