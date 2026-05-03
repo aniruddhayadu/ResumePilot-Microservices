@@ -28,7 +28,6 @@ public class PaymentController {
 	@Operation(summary = "Create Razorpay Order")
 	public ResponseEntity<String> crtOrd(@RequestBody Map<String, Object> req) {
 		try {
-			// Amount ko paise mein convert karna padta hai
 			int amt = (int) (Double.parseDouble(req.get("amount").toString()) * 100);
 
 			RazorpayClient razorpay = new RazorpayClient(keyId, keySecret);
