@@ -5,6 +5,8 @@ public class ResumeDTO {
 	private String content;
 	private String templateId;
 
+		private String userEmail;
+
 	public ResumeDTO() {
 	}
 
@@ -30,5 +32,13 @@ public class ResumeDTO {
 
 	public void setTemplateId(String templateId) {
 		this.templateId = templateId;
+	}
+
+	public String getUserEmail() {
+		return userEmail;
+	}
+
+	public void setUserEmail(String userEmail) {
+		this.userEmail = userEmail;
 	}
 }
