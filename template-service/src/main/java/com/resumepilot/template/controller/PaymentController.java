@@ -8,6 +8,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Map;
 
@@ -17,36 +19,44 @@ import java.util.Map;
 @Tag(name = "Payment Management")
 public class PaymentController {
 
-	// 🚀 Tere Environment Variables / application.yml se direct value aayegi!
 	@Value("${razorpay.key}")
-	private String keyId;
+	private String kId;
 
 	@Value("${razorpay.secret}")
-	private String keySecret;
+	private String kSec;
+
+	@Value("${app.test.email}")
+	private String tEml;
+
+	@Autowired
+	private KafkaTemplate<String, String> kTmp;
 
 	@PostMapping("/create-order")
 	@Operation(summary = "Create Razorpay Order")
 	public ResponseEntity<String> crtOrd(@RequestBody Map<String, Object> req) {
 		try {
-			int amt = (int) (Double.parseDouble(req.get("amount").toString()) * 100);
+			int a = (int) (Double.parseDouble(req.get("amount").toString()) * 100);
 
-			RazorpayClient razorpay = new RazorpayClient(keyId, keySecret);
-			JSONObject orderRequest = new JSONObject();
-			orderRequest.put("amount", amt);
-			orderRequest.put("currency", "INR");
-			orderRequest.put("receipt", "txn_" + System.currentTimeMillis());
+			RazorpayClient rzp = new RazorpayClient(kId, kSec);
+			JSONObject oReq = new JSONObject();
+			oReq.put("amount", a);
+			oReq.put("currency", "INR");
+			oReq.put("receipt", "txn_" + System.currentTimeMillis());
 
-			Order order = razorpay.orders.create(orderRequest);
-			return ResponseEntity.ok(order.get("id").toString());
+			Order o = rzp.orders.create(oReq);
+			return ResponseEntity.ok(o.get("id").toString());
 
-		} catch (Exception e) {
-			return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
+		} catch (Exception x) {
+			return ResponseEntity.internalServerError().body("Error: " + x.getMessage());
 		}
 	}
 
 	@PostMapping("/verify")
 	@Operation(summary = "Verify Razorpay Payment")
-	public ResponseEntity<String> verifyPayment(@RequestBody Map<String, Object> data) {
-		return ResponseEntity.ok("Payment Verified Successfully");
+	public ResponseEntity<String> vfyPay(@RequestBody Map<String, Object> req) {
+		String e = req.containsKey("email") ? req.get("email").toString() : tEml;
+		System.out.println("Payment successful for: " + e);
+		kTmp.send("notification_topic", e);
+		return ResponseEntity.ok("Verified");
 	}
 }

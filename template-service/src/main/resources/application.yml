@@ -4,10 +4,17 @@ server:
 spring:
     application:
         name: template-service
+
+    # 🚀 Kafka Producer Configuration
+    kafka:
+        bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+    # 🚀 Yahan hai asli jaadu (resume_ai_db) jisme tere photos hain!
     datasource:
         url: jdbc:mysql://localhost:3306/resume_ai_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC
         username: ${DB_USERNAME}
         password: ${DB_PASSWORD}
+
     jpa:
         hibernate:
             ddl-auto: update
@@ -28,6 +35,10 @@ eureka:
 razorpay:
     key: ${RAZORPAY_KEY}
     secret: ${RAZORPAY_SECRET}
+
+app:
+    test:
+        email: ${TEST_EMAIL}
 
 resilience4j:
     circuitbreaker:

@@ -30,6 +30,12 @@ public class AuthResource {
 		return ResponseEntity.ok(svc.login(req));
 	}
 
+	@PostMapping("/verify-otp")
+	public ResponseEntity<String> verifyOtp(@RequestBody Map<String, String> payload) {
+		svc.verifyOtp(payload.get("email"), payload.get("otp"));
+		return ResponseEntity.ok("Email verified successfully.");
+	}
+
 	@GetMapping("/oauth2-success")
 	public ResponseEntity<AuthResponse> googleLoginSuccess(@AuthenticationPrincipal OAuth2User principal) {
 		if (principal == null) {
@@ -40,7 +46,6 @@ public class AuthResource {
 		return ResponseEntity.ok(svc.processOAuthPostLogin(email, name));
 	}
 
-	// NAYE ENDPOINTS FORGOT PASSWORD KE LIYE
 	@PostMapping("/forgot-password")
 	public ResponseEntity<String> forgotPassword(@RequestBody Map<String, String> payload) {
 		String email = payload.get("email");

@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "`user`") // Backticks zaroori hain reserved keyword ke liye
+@Table(name = "`user`")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -13,31 +13,44 @@ public class User {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "user_id") // DB column 'user_id' se match kiya
+	@Column(name = "user_id")
 	private Long userId;
 
-	@Column(name = "full_name") // DB column 'full_name'
+	@Column(name = "full_name")
 	private String fullName;
 
 	@Column(unique = true)
 	private String email;
 
-	@Column(name = "password_hash", nullable = false) // DB column 'password_hash'
+	@Column(name = "password_hash", nullable = false)
 	private String passwordHash;
 
 	private String phone;
+
 	private String role;
 
-	@Column(name = "subscription_plan") // DB column 'subscription_plan'
+	@Column(name = "subscription_plan")
 	private String subscriptionPlan;
 
-	@Column(name = "is_active") // DB column 'is_active'
+	@Column(name = "is_active")
 	private boolean isActive = true;
 
-	@Column(name = "created_at") // DB column 'created_at'
+	@Column(name = "is_verified", columnDefinition = "boolean default false")
+	private boolean isVerified;
+
+	@Column(name = "otp")
+	private String otp;
+
+	@Column(name = "otp_expiry")
+	private LocalDateTime otpExpiry;
+
+	@Column(name = "created_at")
 	private LocalDateTime createdAt;
 
+	@Column(name = "reset_token")
 	private String resetToken;
+
+	@Column(name = "reset_token_expiry")
 	private LocalDateTime resetTokenExpiry;
 
 	@PrePersist
@@ -45,12 +58,11 @@ public class User {
 		this.createdAt = LocalDateTime.now();
 	}
 
-	// AuthServiceImpl ke saath purani compatibility ke liye
 	public boolean isActive() {
 		return isActive;
 	}
 
 	public void setActive(boolean active) {
-		isActive = active;
+		this.isActive = active;
 	}
 }

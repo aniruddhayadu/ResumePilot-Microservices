@@ -23,31 +23,50 @@ public class AuthServiceImpl implements AuthService {
 	private final UserRepository repo;
 	private final PasswordEncoder enc;
 	private final JwtUtil jwt;
-	private final JavaMailSender mailSender; // NAYA: Email Bhejne ke liye
+	private final JavaMailSender mailSender;
 
 	@Override
 	public AuthResponse register(RegisterRequest req) {
-		if (repo.existsByEmail(req.getEmail())) {
+		String cleanEmail = req.getEmail().toLowerCase().trim();
+
+		if (repo.existsByEmail(cleanEmail)) {
 			throw new RuntimeException("Email already in use");
 		}
 
+		String generatedOtp = String.valueOf((int) (Math.random() * 900000) + 100000);
+
 		User u = new User();
 		u.setFullName(req.getFullName());
-		u.setEmail(req.getEmail());
+		u.setEmail(cleanEmail);
 		u.setPhone(req.getPhone());
 		u.setPasswordHash(enc.encode(req.getPassword()));
-		u.setRole("FREE"); // NAYA: Default role Free
+		u.setRole("FREE");
 		u.setSubscriptionPlan("FREE");
 		u.setActive(true);
+		u.setVerified(false);
+		u.setOtp(generatedOtp);
+		u.setOtpExpiry(LocalDateTime.now().plusMinutes(10));
+
 		repo.save(u);
 
-		String token = jwt.generateToken(u.getEmail(), u.getRole());
-		return new AuthResponse(token, u.getRole(), u.getFullName());
+		try {
+			sendEmail(u.getEmail(), "ResumePilot - Verify Your Email",
+					"Your OTP for registration is: " + generatedOtp + "\n\nThis OTP is valid for 10 minutes.");
+		} catch (Exception e) {
+			System.out.println("Error sending email: " + e.getMessage());
+		}
+
+		return new AuthResponse(null, "FREE", u.getFullName());
 	}
 
 	@Override
 	public AuthResponse login(AuthRequest req) {
-		User u = repo.findByEmail(req.getEmail()).orElseThrow(() -> new RuntimeException("Invalid email or password"));
+		String cleanEmail = req.getEmail().toLowerCase().trim();
+		User u = repo.findByEmail(cleanEmail).orElseThrow(() -> new RuntimeException("Invalid email or password"));
+
+		if (!u.isVerified()) {
+			throw new RuntimeException("Please verify your email first!");
+		}
 
 		if (!enc.matches(req.getPassword(), u.getPasswordHash())) {
 			throw new RuntimeException("Invalid email or password");
@@ -58,18 +77,41 @@ public class AuthServiceImpl implements AuthService {
 	}
 
 	@Override
+	public void verifyOtp(String email, String otp) {
+		String cleanEmail = email.toLowerCase().trim();
+		User u = repo.findByEmail(cleanEmail).orElseThrow(() -> new RuntimeException("User not found"));
+
+		if (u.isVerified()) {
+			throw new RuntimeException("User is already verified");
+		}
+		if (u.getOtpExpiry() == null || u.getOtpExpiry().isBefore(LocalDateTime.now())) {
+			throw new RuntimeException("OTP has expired. Please register again.");
+		}
+		if (!u.getOtp().equals(otp.trim())) {
+			throw new RuntimeException("Invalid OTP entered.");
+		}
+
+		u.setVerified(true);
+		u.setOtp(null);
+		u.setOtpExpiry(null);
+		repo.save(u);
+	}
+
+	@Override
 	public AuthResponse processOAuthPostLogin(String email, String name) {
-		Optional<User> userOptional = repo.findByEmail(email);
+		String cleanEmail = email.toLowerCase().trim();
+		Optional<User> userOptional = repo.findByEmail(cleanEmail);
 
 		User u;
 		if (userOptional.isEmpty()) {
 			u = new User();
-			u.setEmail(email);
+			u.setEmail(cleanEmail);
 			u.setFullName(name);
 			u.setPasswordHash("OAUTH2_USER");
-			u.setRole("FREE"); // NAYA: Default role
+			u.setRole("FREE");
 			u.setSubscriptionPlan("FREE");
 			u.setActive(true);
+			u.setVerified(true);
 			repo.save(u);
 		} else {
 			u = userOptional.get();
@@ -79,27 +121,21 @@ public class AuthServiceImpl implements AuthService {
 		return new AuthResponse(token, u.getRole(), u.getFullName());
 	}
 
-	// ================= FORGOT PASSWORD LOGIC =================
-
 	@Override
 	public void forgotPassword(String email) {
-		User user = repo.findByEmail(email).orElseThrow(() -> new RuntimeException("User not found with this email"));
+		String cleanEmail = email.toLowerCase().trim();
+		User user = repo.findByEmail(cleanEmail)
+				.orElseThrow(() -> new RuntimeException("User not found with this email"));
 
-		// 1. Generate Token
 		String token = UUID.randomUUID().toString();
 		user.setResetToken(token);
 		user.setResetTokenExpiry(LocalDateTime.now().plusMinutes(15));
 		repo.save(user);
 
-		// 2. Send Email
 		String resetUrl = "http://localhost:5173/reset-password?token=" + token;
-		SimpleMailMessage message = new SimpleMailMessage();
-		message.setTo(user.getEmail());
-		message.setSubject("ResumePilot - Password Reset Request");
-		message.setText("To reset your password, click the link below:\n\n" + resetUrl
-				+ "\n\nThis link will expire in 15 minutes.");
-
-		mailSender.send(message);
+		sendEmail(user.getEmail(), "ResumePilot - Password Reset Request",
+				"To reset your password, click the link below:\n\n" + resetUrl
+						+ "\n\nThis link will expire in 15 minutes.");
 	}
 
 	@Override
@@ -115,5 +151,13 @@ public class AuthServiceImpl implements AuthService {
 		user.setResetToken(null);
 		user.setResetTokenExpiry(null);
 		repo.save(user);
+	}
+
+	private void sendEmail(String to, String subject, String body) {
+		SimpleMailMessage message = new SimpleMailMessage();
+		message.setTo(to);
+		message.setSubject(subject);
+		message.setText(body);
+		mailSender.send(message);
 	}
 }
