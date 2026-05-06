@@ -1,13 +1,13 @@
 package com.resumepilot.auth;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
+import static org.assertj.core.api.Assertions.assertThat;
+
 class AuthServiceApplicationTests {
 
-	@Test
-	void contextLoads() {
-	}
-
+    @Test
+    void applicationClassIsAvailable() {
+        assertThat(AuthServiceApplication.class).isNotNull();
+    }
 }

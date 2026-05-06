@@ -13,96 +13,79 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-public class ResumeServiceImplTest {
+class ResumeServiceImplTest {
 
-	@Mock
-	private ResumeRepository resumeRepository;
+    @Mock
+    private ResumeRepository resumeRepository;
 
-	@InjectMocks
-	private ResumeServiceImpl resumeService;
+    @InjectMocks
+    private ResumeServiceImpl resumeService;
 
-	private Resume dummyResume;
+    private Resume resume;
 
-	@BeforeEach
-	void setUp() {
-		dummyResume = new Resume();
-		// Dhyan de: Long values ke aage 'L' lagaya hai
-		dummyResume.setId(1L);
-		dummyResume.setUserEmail("testuser@capgemini.com");
-		dummyResume.setTitle("Software Developer - Capgemini");
-	}
+    @BeforeEach
+    void setUp() {
+        resume = new Resume();
+        resume.setId(1L);
+        resume.setUserEmail("testuser@capgemini.com");
+        resume.setTitle("Software Developer");
+        resume.setContent("{\"summary\":\"Java dev\"}");
+    }
 
-	// resume save check
-	@Test
-	void testSaveResume_Success() {
-		when(resumeRepository.save(any(Resume.class))).thenReturn(dummyResume);
+    @Test
+    void saveResumePersistsResume() {
+        when(resumeRepository.save(any(Resume.class))).thenReturn(resume);
 
-		Resume savedResume = resumeService.saveResume(dummyResume);
+        Resume savedResume = resumeService.saveResume(resume);
 
-		assertNotNull(savedResume);
-		assertEquals("Software Developer - Capgemini", savedResume.getTitle());
-		verify(resumeRepository, times(1)).save(any(Resume.class));
-	}
+        assertThat(savedResume).isSameAs(resume);
+        verify(resumeRepository).save(resume);
+    }
 
-	// TEST 2: fetching resume by email
-	@Test
-	void testGetResumesByEmail_Found() {
-		when(resumeRepository.findByUserEmail("testuser@capgemini.com")).thenReturn(List.of(dummyResume));
+    @Test
+    void getResumesByEmailReturnsMatches() {
+        when(resumeRepository.findByUserEmail("testuser@capgemini.com")).thenReturn(List.of(resume));
 
-		List<Resume> resultList = resumeService.getResumesByEmail("testuser@capgemini.com");
+        List<Resume> result = resumeService.getResumesByEmail("testuser@capgemini.com");
 
-		assertNotNull(resultList);
-		assertEquals(1, resultList.size());
-		assertEquals("testuser@capgemini.com", resultList.get(0).getUserEmail());
-	}
+        assertThat(result).containsExactly(resume);
+    }
 
-	// fetching resume by id
-	@Test
-	void testGetResumeById_Found() {
+    @Test
+    void getResumeByIdReturnsResumeOrThrows() {
+        when(resumeRepository.findById(1L)).thenReturn(Optional.of(resume));
+        when(resumeRepository.findById(999L)).thenReturn(Optional.empty());
 
-		when(resumeRepository.findById(1L)).thenReturn(Optional.of(dummyResume));
+        assertThat(resumeService.getResumeById(1L)).isSameAs(resume);
+        assertThatThrownBy(() -> resumeService.getResumeById(999L))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Resume not found");
+    }
 
-		Resume result = resumeService.getResumeById(1L);
+    @Test
+    void deleteResumeDeletesOnlyWhenFound() {
+        when(resumeRepository.existsById(1L)).thenReturn(true);
 
-		assertNotNull(result);
-		assertEquals(1L, result.getId());
-	}
+        resumeService.deleteResume(1L);
 
-	// if id not found
-	@Test
-	void testGetResumeById_NotFound() {
-		when(resumeRepository.findById(999L)).thenReturn(Optional.empty());
+        verify(resumeRepository).deleteById(1L);
+    }
 
-		assertThrows(ResourceNotFoundException.class, () -> {
-			resumeService.getResumeById(999L);
-		});
-	}
+    @Test
+    void deleteResumeThrowsWhenMissing() {
+        when(resumeRepository.existsById(999L)).thenReturn(false);
 
-	// delete resume
-	@Test
-	void testDeleteResume_Success() {
-		when(resumeRepository.existsById(1L)).thenReturn(true);
-		doNothing().when(resumeRepository).deleteById(1L);
-
-		assertDoesNotThrow(() -> resumeService.deleteResume(1L));
-
-		verify(resumeRepository, times(1)).deleteById(1L);
-	}
-
-	// wrong id check
-	@Test
-	void testDeleteResume_NotFound() {
-		when(resumeRepository.existsById(999L)).thenReturn(false);
-
-		assertThrows(ResourceNotFoundException.class, () -> {
-			resumeService.deleteResume(999L);
-		});
-
-		verify(resumeRepository, never()).deleteById(anyLong());
-	}
+        assertThatThrownBy(() -> resumeService.deleteResume(999L))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Cannot delete");
+        verify(resumeRepository, never()).deleteById(999L);
+    }
 }

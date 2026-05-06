@@ -40,6 +40,14 @@ class AiUsageLimiterTest {
     }
 
     @Test
+    void normalUsersWithoutPaidPlanUseFreeQuota() {
+        AiUsageLimiter limiter = new AiUsageLimiter(1, fixedClock);
+
+        assertThat(limiter.tryConsume("user@example.com", "USER", "USER").allowed()).isTrue();
+        assertThat(limiter.tryConsume("user@example.com", "USER", "USER").allowed()).isFalse();
+    }
+
+    @Test
     void anonymousUsersShareAnonymousBucket() {
         AiUsageLimiter limiter = new AiUsageLimiter(1, fixedClock);
 

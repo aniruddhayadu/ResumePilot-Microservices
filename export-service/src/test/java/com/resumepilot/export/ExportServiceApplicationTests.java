@@ -1,13 +1,13 @@
-package com.resumepilot.template;
+package com.resumepilot.export;
 
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class TemplateServiceApplicationTests {
+class ExportServiceApplicationTests {
 
     @Test
     void applicationClassIsAvailable() {
-        assertThat(TemplateServiceApplication.class).isNotNull();
+        assertThat(ExportServiceApplication.class).isNotNull();
     }
 }

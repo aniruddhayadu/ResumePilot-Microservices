@@ -1,12 +1,8 @@
 package com.resumepilot.template;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
-
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
-
+import com.resumepilot.template.entity.Template;
+import com.resumepilot.template.repository.TemplateRepository;
+import com.resumepilot.template.service.TemplateServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,49 +10,68 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.resumepilot.template.entity.Template;
-import com.resumepilot.template.repository.TemplateRepository;
-import com.resumepilot.template.service.TemplateServiceImpl;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TemplateServiceImplTest {
 
-	@Mock
-	private TemplateRepository repo;
+    @Mock
+    private TemplateRepository repo;
 
-	@InjectMocks
-	private TemplateServiceImpl srv;
+    @InjectMocks
+    private TemplateServiceImpl service;
 
-	private Template tpl;
+    private Template template;
 
-	@BeforeEach
-	void setup() {
-		tpl = new Template();
-		tpl.setId(1L);
-		tpl.setName("Pro ATS");
-		tpl.setIsPremium(true);
-		tpl.setPrice(49.0);
-	}
+    @BeforeEach
+    void setup() {
+        template = new Template();
+        template.setId(1L);
+        template.setName("Pro ATS");
+        template.setIsPremium(true);
+        template.setPrice(49.0);
+    }
 
-	@Test
-	void testGetAll() {
-		when(repo.findAll()).thenReturn(Arrays.asList(tpl));
+    @Test
+    void getAllTemplatesReturnsRepositoryResults() {
+        when(repo.findAll()).thenReturn(List.of(template));
 
-		List<Template> res = srv.getAllTemplates();
+        List<Template> result = service.getAllTemplates();
 
-		assertEquals(1, res.size());
-		assertEquals("Pro ATS", res.get(0).getName());
-		verify(repo, times(1)).findAll();
-	}
+        assertThat(result).containsExactly(template);
+        verify(repo).findAll();
+    }
 
-	@Test
-	void testGetById() {
-		when(repo.findById(1L)).thenReturn(Optional.of(tpl));
+    @Test
+    void saveTemplatePersistsTemplate() {
+        when(repo.save(any(Template.class))).thenReturn(template);
 
-		Template res = srv.getTemplateById(1L);
+        Template result = service.saveTemplate(template);
 
-		assertNotNull(res);
-		assertEquals(1L, res.getId());
-		verify(repo, times(1)).findById(1L);
-	}
+        assertThat(result).isSameAs(template);
+        verify(repo).save(template);
+    }
+
+    @Test
+    void getTemplateByIdReturnsTemplateOrThrows() {
+        when(repo.findById(1L)).thenReturn(Optional.of(template));
+        when(repo.findById(2L)).thenReturn(Optional.empty());
+
+        assertThat(service.getTemplateById(1L)).isSameAs(template);
+        assertThatThrownBy(() -> service.getTemplateById(2L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Template not found");
+    }
+
+    @Test
+    void fallbackGetTemplatesReturnsEmptyList() {
+        assertThat(service.fallbackGetTemplates(new RuntimeException("db down"))).isEmpty();
+    }
 }

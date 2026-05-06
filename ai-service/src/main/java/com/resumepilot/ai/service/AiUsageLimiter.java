@@ -1,5 +1,6 @@
 package com.resumepilot.ai.service;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -12,14 +13,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Service
 public class AiUsageLimiter {
 
-    private static final String FREE_ROLE = "FREE";
-    private static final String FREE_PLAN = "FREE";
+    private static final String ADMIN_ROLE = "ADMIN";
+    private static final String PRO_PLAN = "PRO";
+    private static final String PREMIUM_PLAN = "PREMIUM";
+    private static final String PAID_PLAN = "PAID";
     private static final String ANONYMOUS_USER = "anonymous";
 
     private final int freeDailyLimit;
     private final Clock clock;
     private final Map<String, UsageCounter> usageCounters = new ConcurrentHashMap<>();
-
+    @Autowired
     public AiUsageLimiter(@Value("${ai.usage.free-daily-limit:5}") int freeDailyLimit) {
         this(freeDailyLimit, Clock.systemDefaultZone());
     }
@@ -60,7 +63,13 @@ public class AiUsageLimiter {
     private boolean isFreeUser(String userRole, String subscriptionPlan) {
         String role = normalize(userRole);
         String plan = normalize(subscriptionPlan);
-        return role.isBlank() || FREE_ROLE.equals(role) || FREE_PLAN.equals(plan);
+        if (ADMIN_ROLE.equals(role)) {
+            return false;
+        }
+        if (PRO_PLAN.equals(plan) || PREMIUM_PLAN.equals(plan) || PAID_PLAN.equals(plan)) {
+            return false;
+        }
+        return true;
     }
 
     private String normalizeEmail(String userEmail) {

@@ -1,11 +1,12 @@
 package com.resumepilot.jobmatch.service;
 
-import com.resumepilot.jobmatch.entity.JobMatch;
-import com.resumepilot.jobmatch.repository.JobMatchRepository;
-import com.resumepilot.jobmatch.client.AiServiceClient; // 🚀 Naya Import
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.resumepilot.jobmatch.client.AiServiceClient;
+import com.resumepilot.jobmatch.entity.JobMatch;
+import com.resumepilot.jobmatch.repository.JobMatchRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -22,11 +23,12 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class JobMatchServiceImpl implements JobMatchService {
 
 	private final JobMatchRepository repository;
 	private final RestTemplate restTemplate;
-	private final AiServiceClient aiServiceClient; // 🚀 Inject kiya
+	private final AiServiceClient aiServiceClient;
 
 	@Value("${api.rapidapi.key}")
 	private String apiKey;
@@ -48,25 +50,22 @@ public class JobMatchServiceImpl implements JobMatchService {
 		match.setSource("LINKEDIN");
 
 		try {
-			// 🚀 AI ko bhejne ke liye request payload banana
 			Map<String, Object> aiRequest = new HashMap<>();
 			aiRequest.put("jobTitle", jobTitle);
 			aiRequest.put("jobDescription", jobDescription);
 			aiRequest.put("resumeContent", resumeContent);
 
-			// 🚀 FeignClient se direct AI-Service call kar rahe hain
-			Map<String, Object> aiResponse = aiServiceClient.getMatchScoreFromAI(aiRequest);
+			Map<String, Object> aiResponse = aiServiceClient.getMatchScoreFromAI(aiRequest, "SERVICE", "PRO");
 
-			// 🚀 AI ka response apne database entity mein save kar rahe hain
-			match.setMatchScore((Integer) aiResponse.getOrDefault("matchScore", 0));
+			match.setMatchScore(toInt(aiResponse.get("matchScore")));
 			match.setMissingSkills((String) aiResponse.getOrDefault("missingSkills", "Analysis Failed"));
 			match.setRecommendations((String) aiResponse.getOrDefault("recommendations", "No recommendations"));
 
 		} catch (Exception e) {
-			System.err.println("❌ AI Service Error: " + e.getMessage());
+			log.error("AI service error while analyzing job fit: {}", e.getMessage());
 			match.setMatchScore(0);
 			match.setMissingSkills("Could not connect to AI Service");
-			match.setRecommendations("Make sure ai-service is running on Eureka.");
+			match.setRecommendations("Make sure ai-service is running and AI_SERVICE_URL points to it.");
 		}
 
 		return repository.save(match);
@@ -103,7 +102,7 @@ public class JobMatchServiceImpl implements JobMatchService {
 			return jobsList;
 
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.error("Job search API request failed: {}", e.getMessage());
 			return new ArrayList<>();
 		}
 	}
@@ -148,5 +147,19 @@ public class JobMatchServiceImpl implements JobMatchService {
 	@Override
 	public List<JobMatch> getTopMatches(int resumeId) {
 		return repository.findByMatchScoreGreaterThan(75);
+	}
+
+	private int toInt(Object value) {
+		if (value instanceof Number number) {
+			return number.intValue();
+		}
+		if (value instanceof String text) {
+			try {
+				return Integer.parseInt(text.trim());
+			} catch (NumberFormatException ignored) {
+				return 0;
+			}
+		}
+		return 0;
 	}
 }

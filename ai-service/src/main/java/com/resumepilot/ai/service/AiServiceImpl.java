@@ -6,7 +6,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -34,10 +37,10 @@ public class AiServiceImpl implements AiService {
 		}
 
 		String prompt = String.format(
-				"Act as an expert resume writer. Write a highly professional small and crips resume summary for a '%s'. "
+				"Act as an expert resume writer. Write a concise, professional, ATS-friendly resume summary for a '%s'. "
 						+ "INSTRUCTIONS: Provide ONLY the paragraph text. Do NOT provide multiple options. "
 						+ "Do NOT use introductory phrases like 'Here is a summary'. Do NOT use bold markdown or bullet points. "
-						+ "Output must be a single, continuous paragraph.bro i just want simple professional summary, impact full and attractive just summary only,,length ka dhyan rkhoo ",
+						+ "Output must be one impactful paragraph of 45 to 70 words.",
 				jobTitle);
 
 		return callGemini(prompt, getFallbackSummary(jobTitle));
@@ -48,8 +51,9 @@ public class AiServiceImpl implements AiService {
 		if (resumeContent == null || resumeContent.trim().isEmpty()) {
 			return "{\"score\": 0, \"feedback\": \"Resume content is empty. Please fill in your details.\"}";
 		}
+
 		String prompt = String.format("Analyze this resume for the role of '%s'.\n\nResume Content:\n%s\n\n"
-				+ "Provide an ATS score out of 100 and brief feedback. bro do it fairly , ache se i think u have understood "
+				+ "Provide a fair ATS score out of 100 and brief, actionable feedback. "
 				+ "You MUST return ONLY a valid raw JSON object in this exact format: {\"score\": 85, \"feedback\": \"Good skills.\"} "
 				+ "Do not add any markdown formatting.", jobTitle, resumeContent);
 
@@ -68,14 +72,13 @@ public class AiServiceImpl implements AiService {
 				jobTitle, jobDescription, resumeContent);
 
 		String fallbackJson = "{\"matchScore\": 0, \"missingSkills\": \"Could not analyze\", \"recommendations\": \"AI Service is down.\"}";
-
 		String jsonResult = callGemini(prompt, fallbackJson);
 
 		try {
 			return objectMapper.readValue(jsonResult, new TypeReference<Map<String, Object>>() {
 			});
 		} catch (Exception e) {
-			log.error("❌ JSON mapping me error aa gaya Job Match ka: {}", e.getMessage());
+			log.error("Failed to map AI job-match JSON: {}", e.getMessage());
 			return Map.of("matchScore", 0, "missingSkills", "Parse Error", "recommendations",
 					"Failed to parse AI response.");
 		}
@@ -83,8 +86,13 @@ public class AiServiceImpl implements AiService {
 
 	private String callGemini(String prompt, String fallbackContent) {
 		try {
+			if (apiKey == null || apiKey.isBlank()) {
+				log.warn("GEMINI_API_KEY is not configured. Returning fallback AI response.");
+				return fallbackContent;
+			}
+
 			String fullUrl = apiUrl + "?key=" + apiKey;
-			log.info("🚀 AI Request (Gemini 2.5 Flash) bhej raha hoon...");
+			log.info("Sending AI request to Gemini.");
 
 			Map<String, Object> requestBody = Map.of("contents",
 					List.of(Map.of("parts", List.of(Map.of("text", prompt)))));
@@ -95,38 +103,61 @@ public class AiServiceImpl implements AiService {
 			HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
 			ResponseEntity<String> response = restTemplate.postForEntity(fullUrl, entity, String.class);
 
-			if (response.getStatusCode() == HttpStatus.OK) {
-				JsonNode root = objectMapper.readTree(response.getBody());
-				String result = root.path("candidates").get(0).path("content").path("parts").get(0).path("text")
-						.asText();
-
-				// STEP 1: Saare Markdown (asterisks, backticks) saaf karo
-				result = result.replace("*", "").replace("`", "").replace("#", "").trim();
-
-				// STEP 2: Agar JSON hai, toh sirf JSON part nikalo
-				if (result.contains("{") && result.contains("}")) {
-					int start = result.indexOf("{");
-					int end = result.lastIndexOf("}");
-					return result.substring(start, end + 1).trim();
-				}
-
-				// STEP 3: Option handling
-				if (result.toLowerCase().contains("option 1")) {
-					String[] options = result.split("(?i)Option 2");
-					result = options[0].replaceAll("(?i)Option 1[:\\-]*", "").trim();
-				}
-
-				// STEP 4: First paragraph only
-				if (result.contains("\n") && !result.contains("{")) {
-					result = result.split("\n")[0];
-				}
-
-				return result.trim();
+			if (response.getStatusCode().is2xxSuccessful()) {
+				String result = cleanAiResponse(extractGeminiText(response.getBody()));
+				return result.isBlank() ? fallbackContent : result;
 			}
 		} catch (Exception e) {
-			log.error("❌ Gemini API fail ho gayi: {}", e.getMessage());
+			log.error("Gemini API request failed: {}", e.getMessage());
 		}
 		return fallbackContent;
+	}
+
+	private String extractGeminiText(String responseBody) throws Exception {
+		JsonNode root = objectMapper.readTree(responseBody);
+		return root.path("candidates")
+				.path(0)
+				.path("content")
+				.path("parts")
+				.path(0)
+				.path("text")
+				.asText("");
+	}
+
+	private String cleanAiResponse(String result) {
+		if (result == null) {
+			return "";
+		}
+
+		String cleaned = result.replace("*", "").replace("`", "").replace("#", "").trim();
+		String json = extractJsonObject(cleaned);
+		if (!json.isBlank()) {
+			return json;
+		}
+
+		if (cleaned.toLowerCase().contains("option 1")) {
+			String[] options = cleaned.split("(?i)Option 2");
+			cleaned = options[0].replaceAll("(?i)Option 1[:\\-]*", "").trim();
+		}
+
+		if (cleaned.contains("\n")) {
+			cleaned = cleaned.lines()
+					.map(String::trim)
+					.filter(line -> !line.isBlank())
+					.findFirst()
+					.orElse("");
+		}
+
+		return cleaned.trim();
+	}
+
+	private String extractJsonObject(String value) {
+		int start = value.indexOf("{");
+		int end = value.lastIndexOf("}");
+		if (start >= 0 && end > start) {
+			return value.substring(start, end + 1).trim();
+		}
+		return "";
 	}
 
 	private String getFallbackSummary(String jobTitle) {

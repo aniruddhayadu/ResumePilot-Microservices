@@ -29,6 +29,10 @@ api:
         host: jsearch.p.rapidapi.com
         url: https://jsearch.p.rapidapi.com/search
 
+ai:
+    service:
+        url: ${AI_SERVICE_URL:http://localhost:8085}
+
 eureka:
     client:
         serviceUrl:
