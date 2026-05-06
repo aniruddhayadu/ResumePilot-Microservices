@@ -1,0 +1,37 @@
+server:
+    port: 8087
+
+spring:
+    application:
+        name: jobmatch-service
+
+    datasource:
+        url: jdbc:mysql://localhost:3306/resume_jobmatch_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+        username: ${DB_USERNAME:root}
+        password: ${DB_PASSWORD:root}
+
+    jpa:
+        hibernate:
+            ddl-auto: update
+        show-sql: true
+
+# Swagger UI Configuration
+springdoc:
+    swagger-ui:
+        path: /swagger-ui.html
+    api-docs:
+        path: /v3/api-docs
+
+# RapidAPI JSearch setup
+api:
+    rapidapi:
+        key: ${RAPIDAPI_KEY}
+        host: jsearch.p.rapidapi.com
+        url: https://jsearch.p.rapidapi.com/search
+
+eureka:
+    client:
+        serviceUrl:
+            defaultZone: http://localhost:8761/eureka/
+        register-with-eureka: true
+        fetch-registry: true

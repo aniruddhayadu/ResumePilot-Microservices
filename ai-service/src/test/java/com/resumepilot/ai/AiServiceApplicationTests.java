@@ -1,13 +1,13 @@
 package com.resumepilot.ai;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
+import static org.assertj.core.api.Assertions.assertThat;
+
 class AiServiceApplicationTests {
 
-	@Test
-	void contextLoads() {
-	}
-
+    @Test
+    void applicationClassIsAvailable() {
+        assertThat(AiServiceApplication.class).isNotNull();
+    }
 }

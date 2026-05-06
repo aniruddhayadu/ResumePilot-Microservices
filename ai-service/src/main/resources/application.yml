@@ -26,6 +26,10 @@ eureka:
     instance:
         prefer-ip-address: true
 
+ai:
+    usage:
+        free-daily-limit: 5
+
 # Gemini AI Configuration
 gemini:
     url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent
