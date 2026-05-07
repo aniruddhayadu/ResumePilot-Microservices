@@ -8,13 +8,20 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
+import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -23,6 +30,8 @@ public class AiServiceImpl implements AiService {
 
 	private final RestTemplate restTemplate;
 	private final ObjectMapper objectMapper = new ObjectMapper();
+	private static final int MAX_ATTEMPTS_PER_ENDPOINT = 2;
+	private static final long RETRY_DELAY_MS = 250L;
 
 	@Value("${gemini.url}")
 	private String apiUrl;
@@ -30,20 +39,29 @@ public class AiServiceImpl implements AiService {
 	@Value("${gemini.key}")
 	private String apiKey;
 
+	@Value("${gemini.fallback-urls:}")
+	private String fallbackApiUrls;
+
 	@Override
 	public String generateSummary(String jobTitle) {
-		if (jobTitle == null || jobTitle.trim().isEmpty()) {
-			return getFallbackSummary("Professional");
-		}
+		return generateSummary(jobTitle, "");
+	}
+
+	@Override
+	public String generateSummary(String jobTitle, String resumeContent) {
+		String normalizedTitle = normalizeJobTitle(jobTitle);
 
 		String prompt = String.format(
 				"Act as an expert resume writer. Write a concise, professional, ATS-friendly resume summary for a '%s'. "
+						+ "Use this candidate context when available and do not invent facts:\n%s\n\n"
 						+ "INSTRUCTIONS: Provide ONLY the paragraph text. Do NOT provide multiple options. "
 						+ "Do NOT use introductory phrases like 'Here is a summary'. Do NOT use bold markdown or bullet points. "
-						+ "Output must be one impactful paragraph of 45 to 70 words.",
-				jobTitle);
+						+ "Do not invent company names, degrees, years, or fake metrics. "
+						+ "Output must be one natural paragraph of 45 to 70 words and must be specific to the role.",
+				normalizedTitle,
+				summarizeResumeContext(resumeContent));
 
-		return callGemini(prompt, getFallbackSummary(jobTitle));
+		return callGemini(prompt);
 	}
 
 	@Override
@@ -53,12 +71,14 @@ public class AiServiceImpl implements AiService {
 		}
 
 		String prompt = String.format("Analyze this resume for the role of '%s'.\n\nResume Content:\n%s\n\n"
-				+ "Provide a fair ATS score out of 100 and brief, actionable feedback. "
-				+ "You MUST return ONLY a valid raw JSON object in this exact format: {\"score\": 85, \"feedback\": \"Good skills.\"} "
-				+ "Do not add any markdown formatting.", jobTitle, resumeContent);
+				+ "Provide a STRICT ATS score out of 100 and brief, actionable feedback. "
+				+ "If the uploaded text is not a real resume or is just a normal paragraph, give a low score between 5 and 25. "
+				+ "Penalize missing resume sections, missing contact details, weak role-keyword alignment, generic text, and lack of measurable achievements. "
+				+ "Reward clear Skills, Experience, Projects, Education, contact details, role-specific keywords, action verbs, and quantified impact. "
+				+ "You MUST return ONLY a valid raw JSON object in this exact format: {\"score\": 22, \"feedback\": \"This does not look like a complete resume.\"} "
+				+ "Do not add any markdown formatting.", normalizeJobTitle(jobTitle), resumeContent);
 
-		String fallbackJson = "{\"score\": 70, \"feedback\": \"Could not reach AI for deep analysis.\"}";
-		return callGemini(prompt, fallbackJson);
+		return callGemini(prompt);
 	}
 
 	@Override
@@ -66,13 +86,12 @@ public class AiServiceImpl implements AiService {
 		String prompt = String.format(
 				"You are an expert ATS (Applicant Tracking System). Compare the following Resume with the Job Description.\n\n"
 						+ "Job Title: %s\nJob Description: %s\n\nResume Content:\n%s\n\n"
-						+ "Task: Evaluate the fit. You MUST return ONLY a valid JSON object in this exact format (no markdown, no quotes outside JSON):\n"
+						+ "Task: Evaluate the fit. You MUST return ONLY a valid raw JSON object in this exact format (no markdown, no quotes outside JSON):\n"
 						+ "{\"matchScore\": 85, \"missingSkills\": \"React, Node.js\", \"recommendations\": \"Add project details about React.\"} \n"
 						+ "matchScore should be an integer from 0 to 100.",
 				jobTitle, jobDescription, resumeContent);
 
-		String fallbackJson = "{\"matchScore\": 0, \"missingSkills\": \"Could not analyze\", \"recommendations\": \"AI Service is down.\"}";
-		String jsonResult = callGemini(prompt, fallbackJson);
+		String jsonResult = callGemini(prompt);
 
 		try {
 			return objectMapper.readValue(jsonResult, new TypeReference<Map<String, Object>>() {
@@ -84,33 +103,105 @@ public class AiServiceImpl implements AiService {
 		}
 	}
 
-	private String callGemini(String prompt, String fallbackContent) {
-		try {
-			if (apiKey == null || apiKey.isBlank()) {
-				log.warn("GEMINI_API_KEY is not configured. Returning fallback AI response.");
-				return fallbackContent;
-			}
-
-			String fullUrl = apiUrl + "?key=" + apiKey;
-			log.info("Sending AI request to Gemini.");
-
-			Map<String, Object> requestBody = Map.of("contents",
-					List.of(Map.of("parts", List.of(Map.of("text", prompt)))));
-
-			HttpHeaders headers = new HttpHeaders();
-			headers.setContentType(MediaType.APPLICATION_JSON);
-
-			HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
-			ResponseEntity<String> response = restTemplate.postForEntity(fullUrl, entity, String.class);
-
-			if (response.getStatusCode().is2xxSuccessful()) {
-				String result = cleanAiResponse(extractGeminiText(response.getBody()));
-				return result.isBlank() ? fallbackContent : result;
-			}
-		} catch (Exception e) {
-			log.error("Gemini API request failed: {}", e.getMessage());
+	private String callGemini(String prompt) {
+		if (apiKey == null || apiKey.isBlank()) {
+			log.error("Gemini API key is not configured. Set GEMINI_API_KEY, GOOGLE_API_KEY, or GEMINI_KEY for ai-service.");
+			throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+					"Gemini API key is not configured for ai-service.");
 		}
-		return fallbackContent;
+
+		for (String endpoint : getGeminiCandidateUrls()) {
+			for (int attempt = 1; attempt <= MAX_ATTEMPTS_PER_ENDPOINT; attempt++) {
+				try {
+					log.info("Sending AI request to Gemini endpoint {} (attempt {}/{}).",
+							maskGeminiEndpoint(endpoint), attempt, MAX_ATTEMPTS_PER_ENDPOINT);
+					String result = postToGemini(endpoint, prompt, expectsJson(prompt));
+					if (!result.isBlank()) {
+						return result;
+					}
+					log.warn("Gemini returned empty content from endpoint {}.", maskGeminiEndpoint(endpoint));
+					break;
+				} catch (RestClientResponseException e) {
+					int status = e.getStatusCode().value();
+					if (isTransientStatus(status) && attempt < MAX_ATTEMPTS_PER_ENDPOINT) {
+						log.warn("Gemini transient error {} from endpoint {}. Retrying once.",
+								status, maskGeminiEndpoint(endpoint));
+						sleepBeforeRetry(attempt);
+						continue;
+					}
+
+					if (isTransientStatus(status)) {
+						log.warn("Gemini endpoint {} failed with transient status {} after {} attempt(s). Trying next endpoint if configured.",
+								maskGeminiEndpoint(endpoint), status, attempt);
+						break;
+					}
+
+					log.error("Gemini API request failed with status {} from endpoint {}: {}",
+							status, maskGeminiEndpoint(endpoint), summarizeError(e.getResponseBodyAsString(), e.getMessage()));
+					throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+							"Gemini API request failed: " + summarizeError(e.getResponseBodyAsString(), e.getMessage()));
+				} catch (Exception e) {
+					if (attempt < MAX_ATTEMPTS_PER_ENDPOINT) {
+						log.warn("Gemini request to endpoint {} failed: {}. Retrying once.",
+								maskGeminiEndpoint(endpoint), e.getMessage());
+						sleepBeforeRetry(attempt);
+						continue;
+					}
+					log.warn("Gemini endpoint {} failed after {} attempt(s): {}",
+							maskGeminiEndpoint(endpoint), attempt, e.getMessage());
+					break;
+				}
+			}
+		}
+
+		log.warn("All Gemini endpoints failed.");
+		throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+				"Gemini AI is unavailable right now. Check ai-service logs and API key configuration.");
+	}
+
+	private String postToGemini(String endpoint, String prompt, boolean jsonResponse) throws Exception {
+		Map<String, Object> generationConfig = jsonResponse
+				? Map.of("temperature", 0.15, "maxOutputTokens", 512, "responseMimeType", "application/json")
+				: Map.of("temperature", 0.55, "maxOutputTokens", 512);
+		Map<String, Object> requestBody = Map.of(
+				"contents", List.of(Map.of("parts", List.of(Map.of("text", prompt)))),
+				"generationConfig", generationConfig
+		);
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_JSON);
+
+		HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
+		ResponseEntity<String> response = restTemplate.postForEntity(appendApiKey(endpoint), entity, String.class);
+
+		if (!response.getStatusCode().is2xxSuccessful()) {
+			return "";
+		}
+
+		return cleanAiResponse(extractGeminiText(response.getBody()));
+	}
+
+	private boolean expectsJson(String prompt) {
+		return prompt != null && prompt.toLowerCase(Locale.ROOT).contains("valid raw json object");
+	}
+
+	private List<String> getGeminiCandidateUrls() {
+		LinkedHashSet<String> endpoints = new LinkedHashSet<>();
+		if (apiUrl != null && !apiUrl.isBlank()) {
+			endpoints.add(apiUrl.trim());
+		}
+		if (fallbackApiUrls != null && !fallbackApiUrls.isBlank()) {
+			Arrays.stream(fallbackApiUrls.split(","))
+					.map(String::trim)
+					.filter(value -> !value.isBlank())
+					.forEach(endpoints::add);
+		}
+		return List.copyOf(endpoints);
+	}
+
+	private String appendApiKey(String endpoint) {
+		String separator = endpoint.contains("?") ? "&" : "?";
+		return endpoint + separator + "key=" + apiKey;
 	}
 
 	private String extractGeminiText(String responseBody) throws Exception {
@@ -160,9 +251,64 @@ public class AiServiceImpl implements AiService {
 		return "";
 	}
 
-	private String getFallbackSummary(String jobTitle) {
-		return String.format(
-				"Results-driven %s with a proven track record of delivering high-quality solutions. Adept at collaborating with cross-functional teams to drive project success. Passionate about continuous learning.",
-				jobTitle);
+	private boolean isTransientStatus(int status) {
+		return status == 429 || status == 500 || status == 503 || status == 504;
 	}
+
+	private void sleepBeforeRetry(int attempt) {
+		try {
+			Thread.sleep(RETRY_DELAY_MS * attempt);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+	}
+
+	private String summarizeError(String responseBody, String fallbackMessage) {
+		String raw = responseBody == null || responseBody.isBlank() ? fallbackMessage : responseBody;
+		if (raw == null) {
+			return "No error details returned";
+		}
+		String compact = raw.replaceAll("\\s+", " ").trim();
+		return compact.length() <= 500 ? compact : compact.substring(0, 500);
+	}
+
+	private String maskGeminiEndpoint(String endpoint) {
+		if (endpoint == null || endpoint.isBlank()) {
+			return "unknown";
+		}
+		int modelIndex = endpoint.indexOf("/models/");
+		if (modelIndex >= 0) {
+			String model = endpoint.substring(modelIndex + "/models/".length());
+			return model.replace(":generateContent", "");
+		}
+		return endpoint.replaceAll("\\?.*$", "");
+	}
+
+	private String summarizeResumeContext(String resumeContent) {
+		if (resumeContent == null || resumeContent.isBlank()) {
+			return "No candidate context provided.";
+		}
+		String cleaned = resumeContent.replaceAll("\\s+", " ").trim();
+		return cleaned.length() <= 900 ? cleaned : cleaned.substring(0, 900);
+	}
+
+	private String normalizeJobTitle(String jobTitle) {
+		String normalized = jobTitle == null ? "" : jobTitle.trim().replaceAll("\\s+", " ");
+		normalized = normalized.replaceAll("[^a-zA-Z0-9+#. /-]", "").trim();
+		if (normalized.isBlank()) {
+			return "Professional";
+		}
+		return Arrays.stream(normalized.split("\\s+"))
+				.map(this::toTitleWord)
+				.collect(Collectors.joining(" "));
+	}
+
+	private String toTitleWord(String word) {
+		if (word.length() <= 3 && word.equals(word.toUpperCase(Locale.ROOT))) {
+			return word;
+		}
+		String lower = word.toLowerCase(Locale.ROOT);
+		return lower.substring(0, 1).toUpperCase(Locale.ROOT) + lower.substring(1);
+	}
+
 }

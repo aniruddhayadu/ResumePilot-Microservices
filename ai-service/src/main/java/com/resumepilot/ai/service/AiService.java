@@ -5,6 +5,8 @@ import java.util.Map;
 public interface AiService {
 	String generateSummary(String jobTitle);
 
+	String generateSummary(String jobTitle, String resumeContent);
+
 	String analyzeResume(String jobTitle, String resumeContent);
 
 	Map<String, Object> analyzeJobMatch(String jobTitle, String jobDescription, String resumeContent);

@@ -17,11 +17,8 @@ eureka:
     instance:
         prefer-ip-address: true
 
-ai:
-    usage:
-        free-daily-limit: 5
-
 # Gemini AI Configuration
 gemini:
     url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent
-    key: ${GEMINI_API_KEY:}
+    key: ${GEMINI_API_KEY:${GOOGLE_API_KEY:${GEMINI_KEY:}}}
+    fallback-urls: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent
