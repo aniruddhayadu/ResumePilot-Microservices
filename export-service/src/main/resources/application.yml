@@ -2,11 +2,17 @@ server:
     port: 8083
 
 spring:
+    config:
+        import:
+            - optional:file:D:/ResumePilot/.env[.properties]
+            - optional:file:../.env[.properties]
+            - optional:file:.env[.properties]
+
     application:
         name: export-service
 
     datasource:
-        url: jdbc:mysql://localhost:3306/resume_export_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+        url: ${EXPORT_DATASOURCE_URL:jdbc:mysql://localhost:3306/resume_export_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
         username: ${DB_USERNAME:root}
         password: ${DB_PASSWORD:root}
 
@@ -18,7 +24,7 @@ spring:
 eureka:
     client:
         serviceUrl:
-            defaultZone: http://localhost:8761/eureka/
+            defaultZone: ${EUREKA_URL:${EUREKA_SERVER_URL:http://localhost:8761/eureka/}}
         register-with-eureka: true
         fetch-registry: true
 
@@ -27,8 +33,8 @@ eureka:
 
 # AWS S3 Configuration (Soft Coded - Enterprise Standard)
 aws:
-    access-key: ${AWS_ACCESS_KEY}
-    secret-key: ${AWS_SECRET_KEY}
+    access-key: ${AWS_ACCESS_KEY:}
+    secret-key: ${AWS_SECRET_KEY:}
     s3:
-        bucket-name: ${AWS_BUCKET_NAME:resumepilot-pdf-exports-bhai}
+        bucket-name: ${AWS_BUCKET_NAME:}
         region: ${AWS_REGION:ap-southeast-2}

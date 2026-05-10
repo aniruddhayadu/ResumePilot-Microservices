@@ -70,6 +70,56 @@ class ExportServiceImplTest {
     }
 
     @Test
+    void exportToPdfCompletesWithMinimalResumeDefaults() {
+        ResumeDto resume = new ResumeDto();
+        resume.setTitle(null);
+        resume.setUserEmail(null);
+        resume.setContent("{}");
+
+        when(exportRepository.save(any(ExportJob.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(restTemplate.getForObject("http://RESUME-SERVICE/resume/get/10", ResumeDto.class)).thenReturn(resume);
+        when(s3StorageService.uploadFile(anyString(), any(byte[].class), eq("application/pdf"))).thenReturn("s3://minimal.pdf");
+
+        ExportJob job = service.exportToPdf(10, 99, null);
+
+        assertThat(job.getStatus()).isEqualTo(JobStatus.COMPLETED);
+        assertThat(job.getFileUrl()).isEqualTo("s3://minimal.pdf");
+        assertThat(job.getCustomizations()).isNull();
+    }
+
+    @Test
+    void exportToPdfUsesEmailDefaultNameAndSkipsBlankSections() {
+        ResumeDto resume = new ResumeDto();
+        resume.setTitle("");
+        resume.setUserEmail("john@example.com");
+        resume.setContent("{\"fullName\":\"\",\"phone\":\"\",\"linkedin\":\"\",\"github\":\"\",\"summary\":\"\",\"skills\":\"Not provided\",\"experience\":\"   \",\"education\":\"BTech\"}");
+
+        when(exportRepository.save(any(ExportJob.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(restTemplate.getForObject("http://RESUME-SERVICE/resume/get/10", ResumeDto.class)).thenReturn(resume);
+        when(s3StorageService.uploadFile(anyString(), any(byte[].class), eq("application/pdf"))).thenReturn("s3://defaults.pdf");
+
+        ExportJob job = service.exportToPdf(10, 99, Map.of());
+
+        assertThat(job.getStatus()).isEqualTo(JobStatus.COMPLETED);
+        assertThat(job.getFileUrl()).isEqualTo("s3://defaults.pdf");
+    }
+
+    @Test
+    void exportToPdfMarksJobFailedWhenResumeContentIsInvalidJson() {
+        ResumeDto resume = new ResumeDto();
+        resume.setTitle("Java Developer");
+        resume.setUserEmail("palak@example.com");
+        resume.setContent("{invalid-json");
+
+        when(exportRepository.save(any(ExportJob.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(restTemplate.getForObject("http://RESUME-SERVICE/resume/get/10", ResumeDto.class)).thenReturn(resume);
+
+        ExportJob job = service.exportToPdf(10, 99, null);
+
+        assertThat(job.getStatus()).isEqualTo(JobStatus.FAILED);
+    }
+
+    @Test
     void getJobStatusReturnsJobOrThrows() {
         ExportJob job = new ExportJob();
         job.setJobId("job-1");

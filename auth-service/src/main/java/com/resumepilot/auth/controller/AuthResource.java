@@ -49,8 +49,7 @@ public class AuthResource {
 	@PostMapping("/forgot-password")
 	public ResponseEntity<String> forgotPassword(@RequestBody Map<String, String> payload) {
 		String email = payload.get("email");
-		svc.forgotPassword(email);
-		return ResponseEntity.ok("Password reset link has been sent to your email.");
+		return ResponseEntity.ok(svc.forgotPassword(email));
 	}
 
 	@PostMapping("/reset-password")

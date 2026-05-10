@@ -2,6 +2,12 @@ server:
     port: 8761
 
 spring:
+    config:
+        import:
+            - optional:file:D:/ResumePilot/.env[.properties]
+            - optional:file:../.env[.properties]
+            - optional:file:.env[.properties]
+
     application:
         name: eureka-server
 
@@ -10,4 +16,4 @@ eureka:
         register-with-eureka: false
         fetch-registry: false
     instance:
-        hostname: localhost
+        hostname: ${EUREKA_INSTANCE_HOSTNAME:${EUREKA_HOSTNAME:localhost}}

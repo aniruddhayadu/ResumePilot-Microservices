@@ -18,4 +18,13 @@ public class KafkaNotificationListener {
 		System.out.println("📥 Kafka received message for: " + userEmail);
 		notificationService.sendPaymentSuccessEmail(userEmail);
 	}
+	@KafkaListener(topics = "auth_otp_topic", groupId = "notification-group")
+	public void listenOtpNotifications(String payload) {
+		String[] parts = payload.split("\\|", 2);
+		if (parts.length != 2 || parts[0].isBlank() || parts[1].isBlank()) {
+			System.err.println("Invalid OTP Kafka payload received");
+			return;
+		}
+		notificationService.sendOtpEmail(parts[0].trim(), parts[1].trim());
+	}
 }

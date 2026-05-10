@@ -11,7 +11,7 @@ public interface AuthService {
 
 	AuthResponse processOAuthPostLogin(String email, String name);
 
-	void forgotPassword(String email);
+	String forgotPassword(String email);
 
 	void resetPassword(String token, String newPassword);
 

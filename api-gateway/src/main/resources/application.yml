@@ -1,30 +1,53 @@
 server:
     port: 8080
+    forward-headers-strategy: native
 
 spring:
+    config:
+        import:
+            - optional:file:D:/ResumePilot/.env[.properties]
+            - optional:file:../.env[.properties]
+            - optional:file:.env[.properties]
+
     application:
         name: api-gateway
     cloud:
         gateway:
+            forwarded:
+                enabled: true
+            x-forwarded:
+                enabled: true
+                for-enabled: true
+                host-enabled: true
+                port-enabled: true
+                proto-enabled: true
             discovery:
                 locator:
                     enabled: true
                     lower-case-service-id: true
 
-            globalcors:
-                add-to-simple-url-handler-mapping: true
-                corsConfigurations:
-                    "[/**]":
-                        allowedOrigins: "http://localhost:5173"
-                        allowedHeaders: "*"
-                        allowedMethods: "*"
-                        allowCredentials: true
-
             routes:
                 - id: auth-service
                   uri: lb://auth-service
                   predicates:
-                      - Path=/auth/**, /oauth2/**, /login/**
+                      - Path=/auth/**,/oauth2/**,/login,/login/**,/login/oauth2/**
+                  filters:
+                      - PreserveHostHeader
+                      - SetRequestHeader=X-Forwarded-Proto, ${OAUTH2_REDIRECT_PROTO:http}
+                      - SetRequestHeader=X-Forwarded-Host, ${OAUTH2_REDIRECT_HOST:localhost}
+                      - SetRequestHeader=X-Forwarded-Port, ${OAUTH2_REDIRECT_PORT:8080}
+
+                - id: template-images
+                  uri: lb://template-service
+                  predicates:
+                      - Path=/templates/images/**
+                  filters:
+                      - RewritePath=/templates/images/(?<segment>.*), /images/$\{segment}
+
+                - id: template-service
+                  uri: lb://template-service
+                  predicates:
+                      - Path=/api/templates/**,/api/payments/**
 
                 - id: resume-service
                   uri: lb://resume-service
@@ -36,9 +59,21 @@ spring:
                   predicates:
                       - Path=/ai/**
 
+                - id: jobmatch-service-api
+                  uri: lb://jobmatch-service
+                  predicates:
+                      - Path=/api/jobmatch/**
+                  filters:
+                      - RewritePath=/api/jobmatch/(?<segment>.*), /job-matches/$\{segment}
+
+                - id: jobmatch-service
+                  uri: lb://jobmatch-service
+                  predicates:
+                      - Path=/job-matches/**
+
 eureka:
     client:
         serviceUrl:
-            defaultZone: http://localhost:8761/eureka/
+            defaultZone: ${EUREKA_URL:${EUREKA_SERVER_URL:http://localhost:8761/eureka/}}
     instance:
         prefer-ip-address: true

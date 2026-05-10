@@ -2,20 +2,34 @@ server:
     port: 8084
 
 spring:
+    config:
+        import:
+            - optional:file:D:/ResumePilot/.env[.properties]
+            - optional:file:../.env[.properties]
+            - optional:file:.env[.properties]
+
     application:
         name: template-service
+    web:
+        resources:
+            static-locations:
+                - classpath:/static/
 
     # 🚀 Kafka Producer Configuration
     kafka:
         bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+        producer:
+            key-serializer: org.apache.kafka.common.serialization.StringSerializer
+            value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
     # 🚀 Yahan hai asli jaadu (resume_ai_db) jisme tere photos hain!
     datasource:
-        url: jdbc:mysql://localhost:3306/resume_ai_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC
-        username: ${DB_USERNAME}
-        password: ${DB_PASSWORD}
+        url: ${TEMPLATE_DATASOURCE_URL:jdbc:mysql://localhost:3306/resume_ai_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+        username: ${DB_USERNAME:root}
+        password: ${DB_PASSWORD:root}
 
     jpa:
+        defer-datasource-initialization: true
         hibernate:
             ddl-auto: update
         show-sql: true
@@ -23,22 +37,27 @@ spring:
             hibernate:
                 dialect: org.hibernate.dialect.MySQLDialect
 
+    sql:
+        init:
+            mode: always
+
 eureka:
     client:
         serviceUrl:
-            defaultZone: http://localhost:8761/eureka/
+            defaultZone: ${EUREKA_URL:${EUREKA_SERVER_URL:http://localhost:8761/eureka/}}
         register-with-eureka: true
         fetch-registry: true
     instance:
         prefer-ip-address: true
 
 razorpay:
-    key: ${RAZORPAY_KEY}
-    secret: ${RAZORPAY_SECRET}
+    key: ${RAZORPAY_KEY:}
+    secret: ${RAZORPAY_SECRET:}
 
 app:
+    gateway-base-url: ${GATEWAY_BASE_URL:http://localhost:8080}
     test:
-        email: ${TEST_EMAIL}
+        email: ${TEST_EMAIL:test@example.com}
 
 resilience4j:
     circuitbreaker:

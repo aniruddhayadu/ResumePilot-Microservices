@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="800" viewBox="0 0 640 800" role="img" aria-label="Professional Classic resume template thumbnail">
+  <rect width="640" height="800" fill="#f7fafc"/>
+  <rect x="64" y="64" width="512" height="672" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="4"/>
+  <rect x="112" y="112" width="210" height="20" rx="6" fill="#0f172a"/>
+  <rect x="112" y="150" width="160" height="10" rx="5" fill="#64748b"/>
+  <rect x="112" y="192" width="416" height="6" rx="3" fill="#e2e8f0"/>
+  <rect x="112" y="232" width="110" height="14" rx="5" fill="#1d4ed8"/>
+  <rect x="112" y="270" width="380" height="10" rx="5" fill="#94a3b8"/>
+  <rect x="112" y="300" width="330" height="10" rx="5" fill="#cbd5e1"/>
+  <rect x="112" y="354" width="110" height="14" rx="5" fill="#1d4ed8"/>
+  <rect x="112" y="392" width="400" height="10" rx="5" fill="#94a3b8"/>
+  <rect x="112" y="422" width="350" height="10" rx="5" fill="#cbd5e1"/>
+</svg>

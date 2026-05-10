@@ -7,6 +7,9 @@ import com.resumepilot.auth.entity.User;
 import com.resumepilot.auth.repository.UserRepository;
 import com.resumepilot.auth.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,6 +27,12 @@ public class AuthServiceImpl implements AuthService {
 	private final PasswordEncoder enc;
 	private final JwtUtil jwt;
 	private final JavaMailSender mailSender;
+
+	@Value("${spring.mail.username}")
+	private String senderEmail;
+
+	@Autowired(required = false)
+	private KafkaTemplate<String, String> kafkaTemplate;
 
 	@Override
 	public AuthResponse register(RegisterRequest req) {
@@ -50,8 +59,7 @@ public class AuthServiceImpl implements AuthService {
 		repo.save(u);
 
 		try {
-			sendEmail(u.getEmail(), "ResumePilot - Verify Your Email",
-					"Your OTP for registration is: " + generatedOtp + "\n\nThis OTP is valid for 10 minutes.");
+			sendOtpNotification(u.getEmail(), generatedOtp);
 		} catch (Exception e) {
 			System.out.println("Error sending email: " + e.getMessage());
 		}
@@ -122,7 +130,7 @@ public class AuthServiceImpl implements AuthService {
 	}
 
 	@Override
-	public void forgotPassword(String email) {
+	public String forgotPassword(String email) {
 		String cleanEmail = email.toLowerCase().trim();
 		User user = repo.findByEmail(cleanEmail)
 				.orElseThrow(() -> new RuntimeException("User not found with this email"));
@@ -133,9 +141,15 @@ public class AuthServiceImpl implements AuthService {
 		repo.save(user);
 
 		String resetUrl = "http://localhost:5173/reset-password?token=" + token;
-		sendEmail(user.getEmail(), "ResumePilot - Password Reset Request",
-				"To reset your password, click the link below:\n\n" + resetUrl
-						+ "\n\nThis link will expire in 15 minutes.");
+		try {
+			sendEmail(user.getEmail(), "ResumePilot - Password Reset Request",
+					"To reset your password, click the link below:\n\n" + resetUrl
+							+ "\n\nThis link will expire in 15 minutes.");
+			return "Password reset link has been sent to your email.";
+		} catch (Exception e) {
+			System.out.println("Error sending reset email: " + e.getMessage());
+			return "Email sending failed, but your local reset link is: " + resetUrl;
+		}
 	}
 
 	@Override
@@ -155,9 +169,19 @@ public class AuthServiceImpl implements AuthService {
 
 	private void sendEmail(String to, String subject, String body) {
 		SimpleMailMessage message = new SimpleMailMessage();
+		message.setFrom(senderEmail);
 		message.setTo(to);
 		message.setSubject(subject);
 		message.setText(body);
 		mailSender.send(message);
+	}
+
+	private void sendOtpNotification(String email, String otp) {
+		if (kafkaTemplate != null) {
+			kafkaTemplate.send("auth_otp_topic", email + "|" + otp);
+			return;
+		}
+		sendEmail(email, "ResumePilot - Verify Your Email",
+				"Your OTP for registration is: " + otp + "\n\nThis OTP is valid for 10 minutes.");
 	}
 }

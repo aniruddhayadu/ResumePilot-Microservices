@@ -21,6 +21,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -78,7 +80,16 @@ public class AiServiceImpl implements AiService {
 				+ "You MUST return ONLY a valid raw JSON object in this exact format: {\"score\": 22, \"feedback\": \"This does not look like a complete resume.\"} "
 				+ "Do not add any markdown formatting.", normalizeJobTitle(jobTitle), resumeContent);
 
-		return callGemini(prompt);
+	try {
+		String result = callGemini(prompt);
+		String normalizedResult = normalizeAtsJson(result);
+		return normalizedResult.isBlank()
+				? fallbackAnalyzeResume(normalizeJobTitle(jobTitle), resumeContent)
+				: normalizedResult;
+	} catch (Exception e) {
+		log.warn("Gemini ATS analysis unavailable; returning local fallback analysis: {}", e.getMessage());
+		return fallbackAnalyzeResume(normalizeJobTitle(jobTitle), resumeContent);
+	}
 	}
 
 	@Override
@@ -161,8 +172,8 @@ public class AiServiceImpl implements AiService {
 
 	private String postToGemini(String endpoint, String prompt, boolean jsonResponse) throws Exception {
 		Map<String, Object> generationConfig = jsonResponse
-				? Map.of("temperature", 0.15, "maxOutputTokens", 512, "responseMimeType", "application/json")
-				: Map.of("temperature", 0.55, "maxOutputTokens", 512);
+				? Map.of("temperature", 0.15, "maxOutputTokens", 2048)
+				: Map.of("temperature", 0.55, "maxOutputTokens", 2048);
 		Map<String, Object> requestBody = Map.of(
 				"contents", List.of(Map.of("parts", List.of(Map.of("text", prompt)))),
 				"generationConfig", generationConfig
@@ -309,6 +320,101 @@ public class AiServiceImpl implements AiService {
 		}
 		String lower = word.toLowerCase(Locale.ROOT);
 		return lower.substring(0, 1).toUpperCase(Locale.ROOT) + lower.substring(1);
+	}
+
+	private String fallbackAnalyzeResume(String jobTitle, String resumeContent) {
+		String content = resumeContent == null ? "" : resumeContent;
+		String lower = content.toLowerCase(Locale.ROOT);
+		int score = 10;
+
+		if (lower.matches("(?s).*\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b.*".toLowerCase(Locale.ROOT))
+				|| lower.matches("(?s).*\\b\\d{10}\\b.*")) {
+			score += 10;
+		}
+		if (containsAny(lower, "skills", "technical skills", "technologies")) {
+			score += 15;
+		}
+		if (containsAny(lower, "experience", "work experience", "internship", "employment")) {
+			score += 15;
+		}
+		if (containsAny(lower, "project", "projects")) {
+			score += 15;
+		}
+		if (containsAny(lower, "education", "degree", "b.tech", "bachelor", "university", "college")) {
+			score += 10;
+		}
+		if (containsRoleKeyword(lower, jobTitle)) {
+			score += 15;
+		}
+		if (lower.matches("(?s).*\\b\\d+%\\b.*") || lower.matches("(?s).*\\b\\d+\\+\\b.*")
+				|| lower.matches("(?s).*\\b\\d+\\.\\d+\\b.*")) {
+			score += 10;
+		}
+		if (content.trim().split("\\s+").length >= 180) {
+			score += 10;
+		}
+
+		score = Math.max(5, Math.min(score, 88));
+		String feedback = "Gemini is currently unavailable or the configured API key is invalid, so ResumePilot used "
+				+ "a local ATS fallback. Score is based on resume structure, contact details, role keywords, projects, "
+				+ "education, experience, and measurable impact. Add role-specific keywords for " + jobTitle
+				+ ", quantify achievements, and keep clear sections for Skills, Experience, Projects, and Education.";
+		return "{\"score\": " + score + ", \"feedback\": \"" + escapeJson(feedback) + "\"}";
+	}
+
+	private boolean containsAny(String value, String... candidates) {
+		return Arrays.stream(candidates).anyMatch(value::contains);
+	}
+
+	private String normalizeAtsJson(String value) {
+		try {
+			JsonNode root = objectMapper.readTree(value);
+			if (root.has("score") && root.has("feedback")
+					&& root.path("score").canConvertToInt()
+					&& !root.path("feedback").asText("").isBlank()) {
+				int score = Math.max(0, Math.min(100, root.path("score").asInt()));
+				return "{\"score\": " + score + ", \"feedback\": \""
+						+ escapeJson(root.path("feedback").asText()) + "\"}";
+			}
+		} catch (Exception e) {
+			log.warn("Gemini returned invalid ATS JSON, trying repair: {}", value);
+		}
+		return repairAtsJson(value);
+	}
+
+	private String repairAtsJson(String value) {
+		if (value == null || value.isBlank()) {
+			return "";
+		}
+
+		Matcher scoreMatcher = Pattern.compile("\"score\"\\s*:\\s*(\\d+)").matcher(value);
+		Matcher feedbackMatcher = Pattern.compile("\"feedback\"\\s*:\\s*\"([\\s\\S]*)").matcher(value);
+		if (!scoreMatcher.find() || !feedbackMatcher.find()) {
+			return "";
+		}
+
+		int score = Math.max(0, Math.min(100, Integer.parseInt(scoreMatcher.group(1))));
+		String feedback = feedbackMatcher.group(1)
+				.replaceAll("\"\\s*}\\s*$", "")
+				.replaceAll("\\s+", " ")
+				.trim();
+		if (feedback.isBlank()) {
+			return "";
+		}
+		return "{\"score\": " + score + ", \"feedback\": \"" + escapeJson(feedback) + "\"}";
+	}
+
+	private boolean containsRoleKeyword(String content, String jobTitle) {
+		if (jobTitle == null || jobTitle.isBlank()) {
+			return false;
+		}
+		return Arrays.stream(jobTitle.toLowerCase(Locale.ROOT).split("\\s+"))
+				.filter(word -> word.length() > 2)
+				.anyMatch(content::contains);
+	}
+
+	private String escapeJson(String value) {
+		return value.replace("\\", "\\\\").replace("\"", "\\\"");
 	}
 
 }

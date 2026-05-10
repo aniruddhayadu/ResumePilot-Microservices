@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -26,14 +27,18 @@ public class JwtFilter extends OncePerRequestFilter {
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
-            String email = jwtUtil.extractEmail(token);
+            try {
+                String email = jwtUtil.extractEmail(token);
 
-            if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-               //Token validity check 
-                if (jwtUtil.validateToken(token, email)) {
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(email, null, new ArrayList<>());
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                    if (jwtUtil.validateToken(token, email)) {
+                        UsernamePasswordAuthenticationToken authToken =
+                                new UsernamePasswordAuthenticationToken(email, null, new ArrayList<>());
+                        SecurityContextHolder.getContext().setAuthentication(authToken);
+                    }
                 }
+            } catch (JwtException | IllegalArgumentException ex) {
+                SecurityContextHolder.clearContext();
             }
         }
         filterChain.doFilter(request, response);
@@ -41,7 +46,11 @@ public class JwtFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getServletPath();
-        return path.startsWith("/auth/") || path.startsWith("/oauth2/") || path.startsWith("/login/");
+        String path = request.getRequestURI();
+        if (path == null || path.isBlank()) {
+            path = request.getServletPath();
+        }
+        return path.startsWith("/auth/") || path.startsWith("/oauth2/") || path.equals("/login")
+                || path.startsWith("/login/");
     }
 }

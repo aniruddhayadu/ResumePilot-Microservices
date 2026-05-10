@@ -33,4 +33,20 @@ public class EmailNotificationServiceImpl implements NotificationService {
             System.err.println("Error sending email: " + e.getMessage());
         }
     }
+
+    @Override
+    public void sendOtpEmail(String toEmail, String otp) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(senderEmail);
+            message.setTo(toEmail);
+            message.setSubject("ResumePilot - Verify Your Email");
+            message.setText("Your OTP for registration is: " + otp + "\n\nThis OTP is valid for 10 minutes.");
+
+            mailSender.send(message);
+            System.out.println("OTP email sent successfully to: " + toEmail);
+        } catch (Exception e) {
+            System.err.println("Error sending OTP email: " + e.getMessage());
+        }
+    }
 }

@@ -2,11 +2,17 @@ server:
     port: 8087
 
 spring:
+    config:
+        import:
+            - optional:file:D:/ResumePilot/.env[.properties]
+            - optional:file:../.env[.properties]
+            - optional:file:.env[.properties]
+
     application:
         name: jobmatch-service
 
     datasource:
-        url: jdbc:mysql://localhost:3306/resume_jobmatch_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+        url: ${JOBMATCH_DATASOURCE_URL:jdbc:mysql://localhost:3306/resume_jobmatch_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
         username: ${DB_USERNAME:root}
         password: ${DB_PASSWORD:root}
 
@@ -25,7 +31,7 @@ springdoc:
 # RapidAPI JSearch setup
 api:
     rapidapi:
-        key: ${RAPIDAPI_KEY}
+        key: ${RAPIDAPI_KEY:}
         host: jsearch.p.rapidapi.com
         url: https://jsearch.p.rapidapi.com/search
 
@@ -36,6 +42,6 @@ ai:
 eureka:
     client:
         serviceUrl:
-            defaultZone: http://localhost:8761/eureka/
+            defaultZone: ${EUREKA_URL:${EUREKA_SERVER_URL:http://localhost:8761/eureka/}}
         register-with-eureka: true
         fetch-registry: true

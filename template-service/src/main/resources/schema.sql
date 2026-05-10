@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS templates (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    name VARCHAR(120) NOT NULL,
+    thumbnail_url VARCHAR(500),
+    type VARCHAR(40),
+    is_premium BOOLEAN NOT NULL DEFAULT FALSE,
+    price DOUBLE NOT NULL DEFAULT 0,
+    PRIMARY KEY (id)
+);

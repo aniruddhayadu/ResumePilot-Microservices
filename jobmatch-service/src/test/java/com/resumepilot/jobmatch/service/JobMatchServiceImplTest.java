@@ -88,6 +88,30 @@ class JobMatchServiceImplTest {
     }
 
     @Test
+    void analyzeJobFitAcceptsStringScoreAndDefaultTextFields() {
+        when(aiServiceClient.getMatchScoreFromAI(any(), eq("SERVICE"), eq("PRO")))
+                .thenReturn(Map.of("matchScore", " 77 "));
+        when(repository.save(any(JobMatch.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        JobMatch result = service.analyzeJobFit(1, 2, "Java", "Backend", "Resume");
+
+        assertThat(result.getMatchScore()).isEqualTo(77);
+        assertThat(result.getMissingSkills()).isEqualTo("Analysis Failed");
+        assertThat(result.getRecommendations()).isEqualTo("No recommendations");
+    }
+
+    @Test
+    void analyzeJobFitFallsBackToZeroForInvalidStringScore() {
+        when(aiServiceClient.getMatchScoreFromAI(any(), eq("SERVICE"), eq("PRO")))
+                .thenReturn(Map.of("matchScore", "not-a-number"));
+        when(repository.save(any(JobMatch.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        JobMatch result = service.analyzeJobFit(1, 2, "Java", "Backend", "Resume");
+
+        assertThat(result.getMatchScore()).isZero();
+    }
+
+    @Test
     void fetchJobsFromLinkedInParsesRapidApiResponse() {
         String body = "{\"data\":[{\"job_title\":\"Java Dev\",\"employer_name\":\"Acme\",\"job_city\":\"Pune\",\"job_apply_link\":\"http://apply\"}]}";
         when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
@@ -100,6 +124,39 @@ class JobMatchServiceImplTest {
                 .containsEntry("company", "Acme")
                 .containsEntry("location", "Pune")
                 .containsEntry("url", "http://apply");
+    }
+
+    @Test
+    void fetchJobsFromLinkedInUsesFallbackLocationAndUrlWhenFieldsMissing() {
+        String body = "{\"data\":[{\"job_title\":\"Java Dev\",\"employer_name\":\"Acme\"}]}";
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(body));
+
+        List<Map<String, Object>> jobs = service.fetchJobsFromLinkedIn("Java", "Remote");
+
+        assertThat(jobs).hasSize(1);
+        assertThat(jobs.get(0)).containsEntry("location", "Remote")
+                .containsEntry("url", "");
+    }
+
+    @Test
+    void fetchJobsFromLinkedInReturnsEmptyWhenDataNodeMissing() {
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(ResponseEntity.ok("{}"));
+
+        assertThat(service.fetchJobsFromLinkedIn("Java", "Remote")).isEmpty();
+    }
+
+    @Test
+    void fetchJobsFromNaukriDelegatesToLinkedInSearchImplementation() {
+        String body = "{\"data\":[{\"job_title\":\"Java Dev\",\"employer_name\":\"Acme\",\"job_city\":\"Pune\",\"job_apply_link\":\"http://apply\"}]}";
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(ResponseEntity.ok(body));
+
+        List<Map<String, Object>> jobs = service.fetchJobsFromNaukri("Java", "Pune");
+
+        assertThat(jobs).hasSize(1);
+        assertThat(jobs.get(0)).containsEntry("title", "Java Dev");
     }
 
     @Test

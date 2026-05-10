@@ -21,7 +21,8 @@ public class SecurityConfig {
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 		return http.cors(cors -> cors.configurationSource(corsConfigurationSource())).csrf(csrf -> csrf.disable())
 				.authorizeHttpRequests(auth -> auth
-						.requestMatchers("/api/templates/**", "/swagger-ui/**", "/v3/api-docs/**", "/error").permitAll()
+						.requestMatchers("/api/templates/**", "/templates/images/**", "/images/**",
+								"/swagger-ui/**", "/v3/api-docs/**", "/error").permitAll()
 						.requestMatchers("/api/payments/**").authenticated().anyRequest().permitAll())
 				.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class).build();
 	}

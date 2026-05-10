@@ -1,12 +1,19 @@
 server:
     port: 8081
+    forward-headers-strategy: native
 
 spring:
+    config:
+        import:
+            - optional:file:D:/ResumePilot/.env[.properties]
+            - optional:file:../.env[.properties]
+            - optional:file:.env[.properties]
+
     application:
         name: auth-service
 
     datasource:
-        url: jdbc:mysql://localhost:3306/resume_auth_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+        url: ${AUTH_DATASOURCE_URL:jdbc:mysql://localhost:3306/resume_auth_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
         username: ${DB_USERNAME:root}
         password: ${DB_PASSWORD:root}
 
@@ -15,17 +22,27 @@ spring:
             ddl-auto: update
         show-sql: true
 
+    kafka:
+        bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+        producer:
+            key-serializer: org.apache.kafka.common.serialization.StringSerializer
+            value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
     mail:
-        host: smtp.gmail.com
-        port: 587
-        username: ${EMAIL_USERNAME} 
-        password: ${EMAIL_PASSWORD} 
+        host: ${MAIL_HOST:smtp.gmail.com}
+        port: ${MAIL_PORT:587}
+        username: ${AUTH_EMAIL_USERNAME:${EMAIL_USERNAME:}}
+        password: ${AUTH_EMAIL_PASSWORD:${EMAIL_PASSWORD:}}
         properties:
             mail:
                 smtp:
                     auth: true
+                    connectiontimeout: 5000
+                    timeout: 5000
+                    writetimeout: 5000
                     starttls:
                         enable: true
+                        required: true
 
     security:
         oauth2:
@@ -34,7 +51,7 @@ spring:
                     google:
                         client-id: ${GOOGLE_CLIENT_ID}
                         client-secret: ${GOOGLE_CLIENT_SECRET}
-                        redirect-uri: "http://localhost:8080/login/oauth2/code/google"
+                        redirect-uri: ${app.oauth2-redirect-uri}
                         scope:
                             - email
                             - profile
@@ -46,13 +63,18 @@ jwt:
     secret: ${JWT_SECRET}
     expiration: 86400000
 
+app:
+    frontend-url: ${FRONTEND_URL:http://localhost:5173}
+    gateway-base-url: ${GATEWAY_BASE_URL:http://localhost:8080}
+    oauth2-redirect-uri: ${app.gateway-base-url}/login/oauth2/code/google
+
 eureka:
     client:
         serviceUrl:
-            defaultZone: http://localhost:8761/eureka/
+            defaultZone: ${EUREKA_URL:${EUREKA_SERVER_URL:http://localhost:8761/eureka/}}
         register-with-eureka: true
         fetch-registry: true
     instance:
         prefer-ip-address: false
-        hostname: localhost
+        hostname: ${EUREKA_INSTANCE_HOSTNAME:localhost}
         instance-id: ${spring.application.name}:${random.value}
