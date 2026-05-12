@@ -5,6 +5,7 @@ import com.razorpay.RazorpayClient;
 import org.json.JSONObject;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +18,7 @@ import java.util.Map;
 @RequestMapping("/api/payments")
 @CrossOrigin(origins = "*")
 @Tag(name = "Payment Management")
+@Slf4j
 public class PaymentController {
 
 	@Value("${razorpay.key}")
@@ -33,9 +35,22 @@ public class PaymentController {
 
 	@PostMapping("/create-order")
 	@Operation(summary = "Create Razorpay Order")
-	public ResponseEntity<String> crtOrd(@RequestBody Map<String, Object> req) {
+	public ResponseEntity<?> crtOrd(@RequestBody Map<String, Object> req) {
 		try {
-			int a = (int) (Double.parseDouble(req.get("amount").toString()) * 100);
+			if (kId == null || kId.isBlank() || kSec == null || kSec.isBlank()) {
+				return ResponseEntity.internalServerError()
+						.body(Map.of("message", "Razorpay credentials are missing. Set RAZORPAY_KEY and RAZORPAY_SECRET in .env."));
+			}
+
+			Object amount = req.get("amount");
+			if (amount == null) {
+				return ResponseEntity.badRequest().body(Map.of("message", "Payment amount is required."));
+			}
+
+			int a = (int) Math.round(Double.parseDouble(amount.toString()) * 100);
+			if (a <= 0) {
+				return ResponseEntity.badRequest().body(Map.of("message", "Payment amount must be greater than zero."));
+			}
 
 			RazorpayClient rzp = new RazorpayClient(kId, kSec);
 			JSONObject oReq = new JSONObject();
@@ -47,7 +62,9 @@ public class PaymentController {
 			return ResponseEntity.ok(o.get("id").toString());
 
 		} catch (Exception x) {
-			return ResponseEntity.internalServerError().body("Error: " + x.getMessage());
+			log.error("Failed to create Razorpay order", x);
+			return ResponseEntity.internalServerError()
+					.body(Map.of("message", "Razorpay order creation failed: " + x.getMessage()));
 		}
 	}
 

@@ -81,7 +81,7 @@ public class TemplateServiceImpl implements TemplateService {
 		String baseUrl = gatewayBaseUrl.endsWith("/")
 				? gatewayBaseUrl.substring(0, gatewayBaseUrl.length() - 1)
 				: gatewayBaseUrl;
-		String path = thumbnailUrl.startsWith("/") ? thumbnailUrl : "/" + thumbnailUrl;
+		String path = normalizeThumbnailPath(thumbnailUrl);
 
 		return Template.builder()
 				.id(template.getId())
@@ -91,5 +91,16 @@ public class TemplateServiceImpl implements TemplateService {
 				.isPremium(template.getIsPremium())
 				.price(template.getPrice())
 				.build();
+	}
+
+	private String normalizeThumbnailPath(String thumbnailUrl) {
+		String path = thumbnailUrl.startsWith("/") ? thumbnailUrl : "/" + thumbnailUrl;
+		if (path.startsWith("/templates/images/")) {
+			return path;
+		}
+		if (path.startsWith("/images/")) {
+			return "/templates" + path;
+		}
+		return "/templates/images" + path;
 	}
 }

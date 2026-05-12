@@ -1,79 +1,113 @@
 server:
-    port: 8080
-    forward-headers-strategy: native
+  port: 8080
+  forward-headers-strategy: native
 
 spring:
-    config:
-        import:
-            - optional:file:D:/ResumePilot/.env[.properties]
-            - optional:file:../.env[.properties]
-            - optional:file:.env[.properties]
+  config:
+    import:
+      - optional:file:D:/ResumePilot/.env[.properties]
+      - optional:file:../.env[.properties]
+      - optional:file:.env[.properties]
 
-    application:
-        name: api-gateway
-    cloud:
-        gateway:
-            forwarded:
-                enabled: true
-            x-forwarded:
-                enabled: true
-                for-enabled: true
-                host-enabled: true
-                port-enabled: true
-                proto-enabled: true
-            discovery:
-                locator:
-                    enabled: true
-                    lower-case-service-id: true
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
 
-            routes:
-                - id: auth-service
-                  uri: lb://auth-service
-                  predicates:
-                      - Path=/auth/**,/oauth2/**,/login,/login/**,/login/oauth2/**
-                  filters:
-                      - PreserveHostHeader
-                      - SetRequestHeader=X-Forwarded-Proto, ${OAUTH2_REDIRECT_PROTO:http}
-                      - SetRequestHeader=X-Forwarded-Host, ${OAUTH2_REDIRECT_HOST:localhost}
-                      - SetRequestHeader=X-Forwarded-Port, ${OAUTH2_REDIRECT_PORT:8080}
+      forwarded:
+        enabled: true
+      x-forwarded:
+        enabled: true
+        for-enabled: true
+        host-enabled: true
+        port-enabled: true
+        proto-enabled: true
 
-                - id: template-images
-                  uri: lb://template-service
-                  predicates:
-                      - Path=/templates/images/**
-                  filters:
-                      - RewritePath=/templates/images/(?<segment>.*), /images/$\{segment}
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
 
-                - id: template-service
-                  uri: lb://template-service
-                  predicates:
-                      - Path=/api/templates/**,/api/payments/**
+      globalcors:
+        cors-configurations:
+          "[/**]":
+            allowedOrigins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders:
+              - "*"
+            exposedHeaders:
+              - Authorization
+              - Location
+            allowCredentials: true
+            maxAge: 3600
 
-                - id: resume-service
-                  uri: lb://resume-service
-                  predicates:
-                      - Path=/resume/**
+      routes:
+        - id: auth-service
+          uri: lb://auth-service
+          predicates:
+            - Path=/auth/**,/oauth2/**,/login,/login/**,/login/oauth2/**,/api/admin/**
+          filters:
+            - PreserveHostHeader
+            - SetRequestHeader=X-Forwarded-Proto, ${OAUTH2_REDIRECT_PROTO:http}
+            - SetRequestHeader=X-Forwarded-Host, ${OAUTH2_REDIRECT_HOST:localhost}
+            - SetRequestHeader=X-Forwarded-Port, ${OAUTH2_REDIRECT_PORT:8080}
 
-                - id: ai-service
-                  uri: lb://ai-service
-                  predicates:
-                      - Path=/ai/**
+        - id: template-images
+          uri: lb://template-service
+          predicates:
+            - Path=/templates/images/**
+          filters:
+            - RewritePath=/templates/images/(?<segment>.*), /images/$\{segment}
 
-                - id: jobmatch-service-api
-                  uri: lb://jobmatch-service
-                  predicates:
-                      - Path=/api/jobmatch/**
-                  filters:
-                      - RewritePath=/api/jobmatch/(?<segment>.*), /job-matches/$\{segment}
+        - id: template-direct-images
+          uri: lb://template-service
+          predicates:
+            - Path=/images/**
 
-                - id: jobmatch-service
-                  uri: lb://jobmatch-service
-                  predicates:
-                      - Path=/job-matches/**
+        - id: template-service
+          uri: lb://template-service
+          predicates:
+            - Path=/api/templates/**,/api/payments/**
 
+        - id: resume-service
+          uri: lb://resume-service
+          predicates:
+            - Path=/resume/**
+
+        - id: ai-service
+          uri: lb://ai-service
+          predicates:
+            - Path=/ai/**
+
+        - id: export-service
+          uri: lb://export-service
+          predicates:
+            - Path=/export/**,/exports/**
+
+        - id: jobmatch-service-api
+          uri: lb://jobmatch-service
+          predicates:
+            - Path=/api/jobmatch/**
+          filters:
+            - RewritePath=/api/jobmatch/(?<segment>.*), /job-matches/$\{segment}
+
+        - id: jobmatch-service
+          uri: lb://jobmatch-service
+          predicates:
+            - Path=/job-matches/**
+
+# YAHAN CHANGE KIYA HAI 👇
 eureka:
-    client:
-        serviceUrl:
-            defaultZone: ${EUREKA_URL:${EUREKA_SERVER_URL:http://localhost:8761/eureka/}}
-    instance:
-        prefer-ip-address: true
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_URL:${EUREKA_SERVER_URL:http://eureka-server:8761/eureka/}}
+  instance:
+    prefer-ip-address: true

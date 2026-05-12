@@ -44,7 +44,7 @@ class PaymentControllerTest {
 
         try (MockedConstruction<RazorpayClient> ignored = mockConstruction(RazorpayClient.class,
                 (mock, context) -> mock.orders = orderClient)) {
-            ResponseEntity<String> response = controller.crtOrd(Map.of("amount", 49.0));
+            ResponseEntity<?> response = controller.crtOrd(Map.of("amount", 49.0));
 
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
             assertThat(response.getBody()).isEqualTo("order_123");
@@ -57,10 +57,10 @@ class PaymentControllerTest {
 
     @Test
     void createOrderReturnsServerErrorForBadAmount() {
-        ResponseEntity<String> response = controller.crtOrd(Map.of("amount", "bad"));
+        ResponseEntity<?> response = controller.crtOrd(Map.of("amount", "bad"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-        assertThat(response.getBody()).startsWith("Error:");
+        assertThat(response.getBody()).asString().contains("Razorpay order creation failed:");
     }
 
     @Test
