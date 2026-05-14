@@ -1,0 +1,40 @@
+server:
+    port: 8083
+
+spring:
+    config:
+        import:
+            - optional:file:D:/ResumePilot/.env[.properties]
+            - optional:file:../.env[.properties]
+            - optional:file:.env[.properties]
+
+    application:
+        name: export-service
+
+    datasource:
+        url: ${EXPORT_DATASOURCE_URL:jdbc:mysql://localhost:3306/resume_export_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}
+        username: ${DB_USERNAME:root}
+        password: ${DB_PASSWORD:root}
+
+    jpa:
+        hibernate:
+            ddl-auto: update
+        show-sql: true
+
+eureka:
+    client:
+        serviceUrl:
+            defaultZone: ${EUREKA_URL:${EUREKA_SERVER_URL:http://localhost:8761/eureka/}}
+        register-with-eureka: true
+        fetch-registry: true
+
+    instance:
+        prefer-ip-address: true
+
+# AWS S3 Configuration (Soft Coded - Enterprise Standard)
+aws:
+    access-key: ${AWS_ACCESS_KEY:}
+    secret-key: ${AWS_SECRET_KEY:}
+    s3:
+        bucket-name: ${AWS_BUCKET_NAME:}
+        region: ${AWS_REGION:ap-southeast-2}
