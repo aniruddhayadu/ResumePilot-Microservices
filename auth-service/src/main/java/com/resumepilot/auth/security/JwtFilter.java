@@ -7,12 +7,13 @@ import jakarta.servlet.http.HttpServletResponse;
 import io.jsonwebtoken.JwtException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -32,8 +33,11 @@ public class JwtFilter extends OncePerRequestFilter {
 
                 if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     if (jwtUtil.validateToken(token, email)) {
+                        String role = jwtUtil.extractRole(token);
+                        String authority = normalizeAuthority(role);
                         UsernamePasswordAuthenticationToken authToken =
-                                new UsernamePasswordAuthenticationToken(email, null, new ArrayList<>());
+                                new UsernamePasswordAuthenticationToken(email, null,
+                                        authority == null ? List.of() : List.of(new SimpleGrantedAuthority(authority)));
                         SecurityContextHolder.getContext().setAuthentication(authToken);
                     }
                 }
@@ -52,5 +56,13 @@ public class JwtFilter extends OncePerRequestFilter {
         }
         return path.startsWith("/auth/") || path.startsWith("/oauth2/") || path.equals("/login")
                 || path.startsWith("/login/");
+    }
+
+    private String normalizeAuthority(String role) {
+        if (role == null || role.isBlank()) {
+            return null;
+        }
+        String cleanRole = role.trim().toUpperCase();
+        return cleanRole.startsWith("ROLE_") ? cleanRole : "ROLE_" + cleanRole;
     }
 }

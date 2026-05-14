@@ -16,6 +16,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -30,6 +31,9 @@ public class AuthServiceImpl implements AuthService {
 
 	@Value("${spring.mail.username}")
 	private String senderEmail;
+
+	@Value("${app.admin-emails:aniruddha9131@gmail.com}")
+	private String adminEmails;
 
 	@Autowired(required = false)
 	private KafkaTemplate<String, String> kafkaTemplate;
@@ -80,8 +84,13 @@ public class AuthServiceImpl implements AuthService {
 			throw new RuntimeException("Invalid email or password");
 		}
 
-		String token = jwt.generateToken(u.getEmail(), u.getRole());
-		return new AuthResponse(token, u.getRole(), u.getFullName());
+		if (applyConfiguredRole(u)) {
+			repo.save(u);
+		}
+
+		String role = effectiveRole(u);
+		String token = jwt.generateToken(u.getEmail(), role);
+		return new AuthResponse(token, role, u.getFullName());
 	}
 
 	@Override
@@ -116,17 +125,21 @@ public class AuthServiceImpl implements AuthService {
 			u.setEmail(cleanEmail);
 			u.setFullName(name);
 			u.setPasswordHash("OAUTH2_USER");
-			u.setRole("FREE");
+			u.setRole(isConfiguredAdmin(cleanEmail) ? "ADMIN" : "FREE");
 			u.setSubscriptionPlan("FREE");
 			u.setActive(true);
 			u.setVerified(true);
 			repo.save(u);
 		} else {
 			u = userOptional.get();
+			if (applyConfiguredRole(u)) {
+				repo.save(u);
+			}
 		}
 
-		String token = jwt.generateToken(u.getEmail(), u.getRole());
-		return new AuthResponse(token, u.getRole(), u.getFullName());
+		String role = effectiveRole(u);
+		String token = jwt.generateToken(u.getEmail(), role);
+		return new AuthResponse(token, role, u.getFullName());
 	}
 
 	@Override
@@ -183,5 +196,35 @@ public class AuthServiceImpl implements AuthService {
 		}
 		sendEmail(email, "ResumePilot - Verify Your Email",
 				"Your OTP for registration is: " + otp + "\n\nThis OTP is valid for 10 minutes.");
+	}
+
+	private String effectiveRole(User user) {
+		if (isConfiguredAdmin(user.getEmail())) {
+			return "ADMIN";
+		}
+		String role = user.getRole();
+		return role == null || role.isBlank() ? "USER" : role;
+	}
+
+	private boolean isConfiguredAdmin(String email) {
+		if (email == null || adminEmails == null || adminEmails.isBlank()) {
+			return false;
+		}
+		String cleanEmail = email.trim().toLowerCase();
+		return Arrays.stream(adminEmails.split(","))
+				.map(String::trim)
+				.map(String::toLowerCase)
+				.anyMatch(cleanEmail::equals);
+	}
+
+	private boolean applyConfiguredRole(User user) {
+		if (!isConfiguredAdmin(user.getEmail())) {
+			return false;
+		}
+		if ("ADMIN".equalsIgnoreCase(user.getRole())) {
+			return false;
+		}
+		user.setRole("ADMIN");
+		return true;
 	}
 }

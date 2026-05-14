@@ -67,6 +67,7 @@ app:
     frontend-url: ${FRONTEND_URL:http://localhost:5173}
     gateway-base-url: ${GATEWAY_BASE_URL:http://localhost:8080}
     oauth2-redirect-uri: ${GOOGLE_REDIRECT_URI:${app.gateway-base-url}/login/oauth2/code/google}
+    admin-emails: ${ADMIN_EMAILS:aniruddha9131@gmail.com}
 
 eureka:
     client:

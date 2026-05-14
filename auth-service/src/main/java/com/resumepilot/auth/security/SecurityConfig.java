@@ -53,8 +53,8 @@ public class SecurityConfig {
 			return config;
 		})).csrf(csrf -> csrf.disable())
 				.authorizeHttpRequests(auth -> auth.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-						// 🚀 Sabse important change: /api/admin/** ko rasta de diya
-						.requestMatchers("/auth/**", "/oauth2/**", "/login", "/login/**", "/api/admin/**").permitAll()
+						.requestMatchers("/auth/**", "/oauth2/**", "/login", "/login/**").permitAll()
+						.requestMatchers("/api/admin/**").hasRole("ADMIN")
 						.anyRequest().authenticated())
 				.exceptionHandling(ex -> ex.authenticationEntryPoint(frontendAwareEntryPoint()))
 				.oauth2Login(oauth2 -> oauth2

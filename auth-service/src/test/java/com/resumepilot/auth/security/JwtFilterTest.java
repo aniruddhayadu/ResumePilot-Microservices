@@ -49,11 +49,15 @@ class JwtFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         when(jwtUtil.extractEmail("jwt-token")).thenReturn("palak@example.com");
         when(jwtUtil.validateToken("jwt-token", "palak@example.com")).thenReturn(true);
+        when(jwtUtil.extractRole("jwt-token")).thenReturn("ADMIN");
 
         filter.doFilter(request, response, filterChain);
 
         assertThat(SecurityContextHolder.getContext().getAuthentication().getPrincipal())
                 .isEqualTo("palak@example.com");
+        assertThat(SecurityContextHolder.getContext().getAuthentication().getAuthorities())
+                .extracting("authority")
+                .containsExactly("ROLE_ADMIN");
         verify(filterChain).doFilter(request, response);
     }
 

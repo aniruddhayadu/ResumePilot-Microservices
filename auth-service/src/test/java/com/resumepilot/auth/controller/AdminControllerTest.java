@@ -58,13 +58,27 @@ class AdminControllerTest {
     @Test
     void getAllUsersReturnsRepositoryUsers() {
         User user = new User();
+        user.setUserId(15L);
+        user.setFullName("Palak");
         user.setEmail("palak@example.com");
+        user.setPasswordHash("secret");
+        user.setRole("FREE");
+        user.setSubscriptionPlan("FREE");
+        user.setActive(true);
+        user.setVerified(true);
         when(userRepository.findAll()).thenReturn(List.of(user));
 
         ResponseEntity<?> response = controller.getAllUsers();
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(bodyAsUserList(response)).containsExactly(user);
+        assertThat(bodyAsUserList(response)).hasSize(1);
+        assertThat(bodyAsUserList(response).get(0))
+                .containsEntry("userId", 15L)
+                .containsEntry("fullName", "Palak")
+                .containsEntry("email", "palak@example.com")
+                .containsEntry("role", "FREE")
+                .containsEntry("subscriptionPlan", "FREE")
+                .doesNotContainKeys("passwordHash", "otp", "resetToken");
     }
 
     @Test
@@ -74,7 +88,7 @@ class AdminControllerTest {
         ResponseEntity<?> response = controller.getAllUsers();
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-        assertThat(response.getBody()).isEqualTo("Error fetching users");
+        assertThat(bodyAsMap(response)).containsEntry("error", "Error fetching users");
     }
 
     @Test
@@ -115,7 +129,7 @@ class AdminControllerTest {
     }
 
     @SuppressWarnings("unchecked")
-    private List<User> bodyAsUserList(ResponseEntity<?> response) {
-        return (List<User>) response.getBody();
+    private List<Map<String, Object>> bodyAsUserList(ResponseEntity<?> response) {
+        return (List<Map<String, Object>>) response.getBody();
     }
 }

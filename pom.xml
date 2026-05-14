@@ -1,0 +1,32 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.resumepilot</groupId>
+    <artifactId>resumepilot</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>ResumePilot</name>
+
+    <modules>
+        <module>ai-service</module>
+        <module>api-gateway</module>
+        <module>auth-service</module>
+        <module>eureka-server</module>
+        <module>export-service</module>
+        <module>jobmatch-service</module>
+        <module>notification-service</module>
+        <module>resume-service</module>
+        <module>template-service</module>
+    </modules>
+
+    <properties>
+        <sonar.host.url>http://localhost:9000</sonar.host.url>
+        <sonar.projectKey>resumepilot</sonar.projectKey>
+        <sonar.projectName>ResumePilot</sonar.projectName>
+        <sonar.sourceEncoding>UTF-8</sonar.sourceEncoding>
+        <sonar.java.coveragePlugin>jacoco</sonar.java.coveragePlugin>
+    </properties>
+</project>

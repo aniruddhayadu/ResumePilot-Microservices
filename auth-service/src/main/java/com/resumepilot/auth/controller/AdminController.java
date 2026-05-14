@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -39,9 +40,24 @@ public class AdminController {
 	@GetMapping("/users")
 	public ResponseEntity<?> getAllUsers() {
 		try {
-			return ResponseEntity.ok(userRepository.findAll());
+			List<Map<String, Object>> users = userRepository.findAll().stream()
+					.map(user -> {
+						Map<String, Object> row = new HashMap<>();
+						row.put("userId", user.getUserId());
+						row.put("fullName", user.getFullName());
+						row.put("email", user.getEmail());
+						row.put("phone", user.getPhone());
+						row.put("role", user.getRole());
+						row.put("subscriptionPlan", user.getSubscriptionPlan());
+						row.put("active", user.isActive());
+						row.put("verified", user.isVerified());
+						row.put("createdAt", user.getCreatedAt());
+						return row;
+					})
+					.toList();
+			return ResponseEntity.ok(users);
 		} catch (Exception e) {
-			return ResponseEntity.status(500).body("Error fetching users");
+			return ResponseEntity.status(500).body(Map.of("error", "Error fetching users"));
 		}
 	}
 
